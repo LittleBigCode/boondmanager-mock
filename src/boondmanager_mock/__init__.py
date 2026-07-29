@@ -35,7 +35,7 @@ applicatif. Les publier ici rompt ce couplage.
 
 from __future__ import annotations
 
-from .app import app
+from .app import app, contrat_openapi
 from .auth import JWT_HEADER_NAME, build_client_jwt
 from .injection import engine
 from .settings import settings
@@ -46,6 +46,7 @@ __all__ = [
     "app",
     "build_client_jwt",
     "build_dataset",
+    "contrat_openapi",
     "engine",
     "settings",
     "state",

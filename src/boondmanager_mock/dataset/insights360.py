@@ -376,11 +376,19 @@ def _faits(
 
         deliveries.append(
             {
-                "id": f"d{rid}",
+                # Plage 1000+ : distincte des resources, mais numérique comme chez le
+                # fournisseur (JSON:API sérialise les identifiants en chaînes,
+                # mais ce sont des nombres).
+                "id": str(1000 + int(rid)),
                 "type": "delivery",
                 "attributes": {
                     "startDate": "2026-01-15",
-                    "endDate": None,
+                    # Une mission sur trois est terminée. Ce n'est pas du
+                    # réalisme décoratif : avec un endDate TOUJOURS nul, dlt ne
+                    # matérialise pas la colonne, et le modèle aval échoue sur
+                    # « column end_date does not exist ». Le schéma produit
+                    # dépendrait alors du contenu du jeu de données.
+                    "endDate": "2026-06-30" if int(rid) % 3 == 0 else None,
                     "businessUnit": entite,
                     "updateDate": _BASE_UPDATE,
                     "isDeleted": False,
@@ -394,7 +402,8 @@ def _faits(
 
         times_reports.append(
             {
-                "id": f"t{rid}",
+                # Plage 2000+, même logique.
+                "id": str(2000 + int(rid)),
                 "type": "timesReport",
                 "attributes": {
                     "term": "2026-06",

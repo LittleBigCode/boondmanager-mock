@@ -89,7 +89,28 @@ def apply_order(
             reverse=reverse,
         )
 
-    if settings.stable_order or engine.first("stable_order", "*") is not None:
+    # ┌─ LE PROFIL `ophelie` EST GELÉ, ORDRE COMPRIS ──────────────────────────┐
+    # │ L'instabilité d'ordre est une PROPRIÉTÉ du profil `insights360`, pas du │
+    # │ mock en général. Le profil `ophelie` reproduit le comportement          │
+    # │ historique, et un profil « gelé » dont la sémantique de pagination      │
+    # │ change n'est pas gelé — il casse simplement plus tard.                  │
+    # │                                                                         │
+    # │ Ce que l'instabilité a révélé au passage mérite d'être écrit : le       │
+    # │ client de production d'ophelie pagine SANS tri explicite. Contre le     │
+    # │ mock instable, il ne retrouvait que 18 des 24 ressources — il en saute  │
+    # │ et en duplique. Contre une vraie API qui ne garantit pas son ordre, le  │
+    # │ même défaut existe, en silence. Cf. docs/features/ordering.md.          │
+    # └─────────────────────────────────────────────────────────────────────────┘
+    # `state.profile` et non `settings.profile` : un `reset(profile=…)` par le
+    # plan de contrôle doit porter, sinon un test qui bascule de profil garderait
+    # la sémantique de l'autre.
+    from .state import state
+
+    if (
+        settings.stable_order
+        or state.profile == "ophelie"
+        or engine.first("stable_order", "*") is not None
+    ):
         return items
 
     return sorted(items, key=lambda i: hash((request_index, i.get("id"))))

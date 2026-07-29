@@ -9,6 +9,7 @@ les pannes ne s'appliqueraient pas.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
@@ -26,24 +27,48 @@ from .envelope import (
 )
 from .errors import error
 from .injection import engine
+from .models import (
+    REPONSES_ERREUR,
+    Agence,
+    Compte,
+    Contact,
+    Cra,
+    DonneesTechniques,
+    ItemEnvelope,
+    ListEnvelope,
+    Mission,
+    Projet,
+    Ressource,
+    Societe,
+)
 from .settings import settings
 from .state import state
 
-# Les collections servies. Ajouter une collection = une entrée ici plus une clé
-# dans le jeu de données. `deliveries` et `times_reports` sont les deux ajouts
-# demandés par insights360 (missions et CRA).
-#
-# Le chemin d'URL n'est pas toujours la clé du dataset : BoondManager expose
-# `times-reports` avec un tiret.
-COLLECTIONS: dict[str, str] = {
-    "resources": "resources",
-    "companies": "companies",
-    "contacts": "contacts",
-    "projects": "projects",
-    "agencies": "agencies",
-    "deliveries": "deliveries",
-    "times-reports": "times_reports",
-}
+
+@dataclass(frozen=True)
+class CollectionSpec:
+    """Ce qu'il faut savoir d'une collection pour la servir ET la documenter.
+
+    La fabrique de routes lit cette table : ajouter une collection, c'est une
+    entrée ici plus une clé dans le jeu de données. Le `modele` est ce qui fait
+    passer le contrat OpenAPI de « liste de chemins » à contrat véritable.
+    """
+
+    chemin: str  # segment d'URL — `times-reports` porte un tiret
+    cle_dataset: str  # clé dans le dict du jeu de données
+    modele: type  # modèle pydantic de l'élément
+    singulier: str  # pour le message 404
+
+
+COLLECTIONS: tuple[CollectionSpec, ...] = (
+    CollectionSpec("resources", "resources", Ressource, "resource"),
+    CollectionSpec("companies", "companies", Societe, "company"),
+    CollectionSpec("contacts", "contacts", Contact, "contact"),
+    CollectionSpec("projects", "projects", Projet, "project"),
+    CollectionSpec("agencies", "agencies", Agence, "agency"),
+    CollectionSpec("deliveries", "deliveries", Mission, "delivery"),
+    CollectionSpec("times-reports", "times_reports", Cra, "timesReport"),
+)
 
 
 def _check_auth(request: Request) -> JSONResponse | None:
@@ -116,7 +141,8 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "boondmanager-mock"}
 
 
-def _paginated(request: Request, path_name: str, dataset_key: str) -> JSONResponse:
+def _paginated(request: Request, spec: CollectionSpec) -> JSONResponse:
+    path_name, dataset_key = spec.chemin, spec.cle_dataset
     params = dict(request.query_params)
     path = f"/api/{path_name}"
 
@@ -144,7 +170,8 @@ def _paginated(request: Request, path_name: str, dataset_key: str) -> JSONRespon
     return JSONResponse(envelope(slice_, total))
 
 
-def _detail(request: Request, path_name: str, dataset_key: str, item_id: str) -> JSONResponse:
+def _detail(request: Request, spec: CollectionSpec, item_id: str) -> JSONResponse:
+    path_name, dataset_key = spec.chemin, spec.cle_dataset
     params = dict(request.query_params)
     if (injected := _dispatch_injections(f"/api/{path_name}/{item_id}", params)) is not None:
         return injected
@@ -153,34 +180,57 @@ def _detail(request: Request, path_name: str, dataset_key: str, item_id: str) ->
     for item in _collection_items(dataset_key):
         if item["id"] == item_id:
             return JSONResponse({"data": item})
-    # Le singulier est obtenu en retirant le `s` final — comportement du mock
-    # d'origine, conservé parce que des tests s'appuient sur le message.
-    return error(404, f"{path_name[:-1]} {item_id} not found")
+    # Le singulier vient de la spec, plus d'un `[:-1]` sur le chemin : ce
+    # découpage donnait « timesReport » → « times-report » sur la collection à
+    # tiret. Les messages des collections historiques sont inchangés.
+    return error(404, f"{spec.singulier} {item_id} not found")
 
 
-def _register(path_name: str, dataset_key: str) -> None:
+def _register(spec: CollectionSpec) -> None:
     """Fabrique de routes.
 
-    La fonction existe pour lier `path_name`/`dataset_key` À CHAQUE ITÉRATION :
-    sans elle, la fermeture capturerait la variable de boucle et toutes les
-    routes serviraient la dernière collection. C'est le même garde-fou que dans
-    le mock d'origine.
+    La fonction existe pour lier `spec` À CHAQUE ITÉRATION : sans elle, la
+    fermeture capturerait la variable de boucle et toutes les routes serviraient
+    la dernière collection. C'est le même garde-fou que dans le mock d'origine.
+
+    `response_model` est déclaré mais les handlers rendent une `JSONResponse` :
+    FastAPI documente alors la forme SANS revalider la sortie. C'est délibéré —
+    un mock doit pouvoir servir des charges volontairement anormales (dérive de
+    pagination, champs manquants) sans que sa propre validation l'en empêche.
+    Le contrat décrit le cas nominal ; les pannes restent injectables.
     """
 
-    @api.get(f"/{path_name}", name=f"list_{dataset_key}")
+    @api.get(
+        f"/{spec.chemin}",
+        name=f"list_{spec.cle_dataset}",
+        response_model=ListEnvelope[spec.modele],  # type: ignore[valid-type]
+        responses=REPONSES_ERREUR,
+        summary=f"Liste paginée : {spec.chemin}",
+    )
     def _list(request: Request) -> JSONResponse:
-        return _paginated(request, path_name, dataset_key)
+        return _paginated(request, spec)
 
-    @api.get(f"/{path_name}/{{item_id}}", name=f"get_{dataset_key}")
+    @api.get(
+        f"/{spec.chemin}/{{item_id}}",
+        name=f"get_{spec.cle_dataset}",
+        response_model=ItemEnvelope[spec.modele],  # type: ignore[valid-type]
+        responses=REPONSES_ERREUR,
+        summary=f"Détail : {spec.singulier}",
+    )
     def _get(request: Request, item_id: str) -> JSONResponse:
-        return _detail(request, path_name, dataset_key, item_id)
+        return _detail(request, spec, item_id)
 
 
-for _path_name, _dataset_key in COLLECTIONS.items():
-    _register(_path_name, _dataset_key)
+for _spec in COLLECTIONS:
+    _register(_spec)
 
 
-@api.get("/resources/{item_id}/technical-data")
+@api.get(
+    "/resources/{item_id}/technical-data",
+    response_model=ItemEnvelope[DonneesTechniques],
+    responses=REPONSES_ERREUR,
+    summary="Onglet CV — seul endroit où vivent les références",
+)
 def technical_data(request: Request, item_id: str) -> JSONResponse:
     """L'onglet CV — seul endroit où vivent les `references[]`."""
     if (
@@ -199,7 +249,12 @@ def technical_data(request: Request, item_id: str) -> JSONResponse:
     return JSONResponse({"data": data})
 
 
-@api.get("/application/current-user")
+@api.get(
+    "/application/current-user",
+    response_model=ItemEnvelope[Compte],
+    responses=REPONSES_ERREUR,
+    summary="Vérification d'identité — test de fumée des identifiants",
+)
 def current_user(request: Request) -> JSONResponse:
     """Vérification d'identité — utilisé comme test de fumée des identifiants."""
     if (denied := _check_auth(request)) is not None:
@@ -265,3 +320,78 @@ def remuneration_csv(request: Request) -> PlainTextResponse | JSONResponse:
             f"{row['periode']},{row['montant_brut_annuel']}"
         )
     return PlainTextResponse("\n".join(lignes) + "\n", media_type="text/csv")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Le contrat
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def contrat_openapi() -> dict[str, Any]:
+    """Le contrat OpenAPI — le DIALECTE BoondManager, et lui seul.
+
+    Les chemins `/__admin` (plan de contrôle des pannes) et `/__fixtures`
+    (rémunération, servie hors de /api faute d'endpoint fournisseur attesté)
+    sont RETIRÉS. Deux raisons :
+
+      • ce sont des affordances du mock, pas du fournisseur. Les publier au
+        contrat ferait passer pour du BoondManager ce qui n'en est pas — et un
+        consommateur pourrait s'y adosser ;
+
+      • `/__admin` n'est monté que si `BOOND_MOCK_ADMIN_ENABLED` est vrai. Le
+        contrat dépendrait alors de l'environnement de génération, et le test
+        anti-dérive échouerait selon la façon dont on l'a lancé.
+
+    Elles restent documentées — dans le README et dans docs/adr/0002 — mais hors
+    du contrat.
+    """
+    spec = app.openapi()
+    spec["paths"] = {
+        chemin: op
+        for chemin, op in spec["paths"].items()
+        if not chemin.startswith(("/__admin", "/__fixtures"))
+    }
+    _elaguer_schemas_orphelins(spec)
+    return spec
+
+
+def _elaguer_schemas_orphelins(spec: dict[str, Any]) -> None:
+    """Retire les schémas que plus aucun chemin ne référence.
+
+    Retirer des chemins laisse leurs schémas derrière eux. Le symptôme est
+    déroutant : le contrat contient `HTTPValidationError` et `ValidationError`
+    UNIQUEMENT quand `/__admin` était monté au moment de la génération — donc le
+    fichier committé diffère selon la valeur d'une variable d'environnement, et
+    le test anti-dérive échoue sans que rien de significatif n'ait changé.
+
+    On résout les `$ref` de façon transitive : un schéma gardé peut en
+    référencer un autre.
+    """
+    schemas = spec.get("components", {}).get("schemas", {})
+    if not schemas:
+        return
+
+    def refs(noeud: Any) -> set[str]:
+        trouves: set[str] = set()
+        if isinstance(noeud, dict):
+            for cle, valeur in noeud.items():
+                if cle == "$ref" and isinstance(valeur, str):
+                    trouves.add(valeur.rsplit("/", 1)[-1])
+                else:
+                    trouves |= refs(valeur)
+        elif isinstance(noeud, list):
+            for element in noeud:
+                trouves |= refs(element)
+        return trouves
+
+    gardes = refs(spec["paths"])
+    # Fermeture transitive : un schéma gardé peut en référencer d'autres.
+    a_explorer = set(gardes)
+    while a_explorer:
+        nom = a_explorer.pop()
+        for suivant in refs(schemas.get(nom, {})):
+            if suivant not in gardes:
+                gardes.add(suivant)
+                a_explorer.add(suivant)
+
+    spec["components"]["schemas"] = {n: c for n, c in schemas.items() if n in gardes}

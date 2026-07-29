@@ -30,6 +30,11 @@ image:       ## Construit l'image
 	docker build -t boondmanager-mock:dev .
 
 contract:    ## Régénère contracts/boondmanager.openapi.yaml depuis l'app
-	$(UV) run python -c "import json,yaml,boondmanager_mock as m; \
-open('contracts/boondmanager.openapi.yaml','w').write(yaml.safe_dump(m.app.openapi(), sort_keys=False, allow_unicode=True))"
-	@echo "✓ contrat régénéré"
+	@# `contrat_openapi()` et non `app.openapi()` : le contrat décrit le DIALECTE
+	@# BoondManager. /__admin et /__fixtures sont des affordances du mock — les
+	@# publier ferait passer pour du fournisseur ce qui n'en est pas, et /__admin
+	@# n'est monté que sous condition, ce qui rendrait le contrat dépendant de
+	@# l'environnement de génération.
+	$(UV) run python -c "import yaml, boondmanager_mock as m; \
+open('contracts/boondmanager.openapi.yaml','w').write(yaml.safe_dump(m.contrat_openapi(), sort_keys=False, allow_unicode=True))"
+	@echo "✓ contrat régénéré — RELIRE le diff : une forme de réponse qui change est un changement de contrat"

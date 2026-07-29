@@ -22,17 +22,56 @@ paths:
                 title: Response Health Health Get
   /api/resources:
     get:
-      summary: List Resources
+      summary: 'Liste paginée : resources'
       operationId: list_resources_api_resources_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Ressource_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/resources/{item_id}:
     get:
-      summary: Get Resources
+      summary: 'Détail : resource'
       operationId: get_resources_api_resources__item_id__get
       parameters:
       - name: item_id
@@ -46,26 +85,98 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Ressource_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/companies:
     get:
-      summary: List Companies
+      summary: 'Liste paginée : companies'
       operationId: list_companies_api_companies_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Societe_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/companies/{item_id}:
     get:
-      summary: Get Companies
+      summary: 'Détail : company'
       operationId: get_companies_api_companies__item_id__get
       parameters:
       - name: item_id
@@ -79,26 +190,98 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Societe_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/contacts:
     get:
-      summary: List Contacts
+      summary: 'Liste paginée : contacts'
       operationId: list_contacts_api_contacts_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Contact_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/contacts/{item_id}:
     get:
-      summary: Get Contacts
+      summary: 'Détail : contact'
       operationId: get_contacts_api_contacts__item_id__get
       parameters:
       - name: item_id
@@ -112,26 +295,98 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Contact_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/projects:
     get:
-      summary: List Projects
+      summary: 'Liste paginée : projects'
       operationId: list_projects_api_projects_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Projet_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/projects/{item_id}:
     get:
-      summary: Get Projects
+      summary: 'Détail : project'
       operationId: get_projects_api_projects__item_id__get
       parameters:
       - name: item_id
@@ -145,26 +400,98 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Projet_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/agencies:
     get:
-      summary: List Agencies
+      summary: 'Liste paginée : agencies'
       operationId: list_agencies_api_agencies_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Agence_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/agencies/{item_id}:
     get:
-      summary: Get Agencies
+      summary: 'Détail : agency'
       operationId: get_agencies_api_agencies__item_id__get
       parameters:
       - name: item_id
@@ -178,26 +505,98 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Agence_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/deliveries:
     get:
-      summary: List Deliveries
+      summary: 'Liste paginée : deliveries'
       operationId: list_deliveries_api_deliveries_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Mission_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/deliveries/{item_id}:
     get:
-      summary: Get Deliveries
+      summary: 'Détail : delivery'
       operationId: get_deliveries_api_deliveries__item_id__get
       parameters:
       - name: item_id
@@ -211,26 +610,98 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Mission_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/times-reports:
     get:
-      summary: List Times Reports
+      summary: 'Liste paginée : times-reports'
       operationId: list_times_reports_api_times_reports_get
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/ListEnvelope_Cra_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/times-reports/{item_id}:
     get:
-      summary: Get Times Reports
+      summary: 'Détail : timesReport'
       operationId: get_times_reports_api_times_reports__item_id__get
       parameters:
       - name: item_id
@@ -244,16 +715,49 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_Cra_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/resources/{item_id}/technical-data:
     get:
-      summary: Technical Data
+      summary: Onglet CV — seul endroit où vivent les références
       description: L'onglet CV — seul endroit où vivent les `references[]`.
       operationId: technical_data_api_resources__item_id__technical_data_get
       parameters:
@@ -268,16 +772,49 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema:
+                $ref: '#/components/schemas/ItemEnvelope_DonneesTechniques_'
+        '401':
+          description: Aucun identifiant fourni.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/application/current-user:
     get:
-      summary: Current User
+      summary: Vérification d'identité — test de fumée des identifiants
       description: Vérification d'identité — utilisé comme test de fumée des identifiants.
       operationId: current_user_api_application_current_user_get
       responses:
@@ -285,52 +822,900 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
-  /__fixtures/remuneration.csv:
-    get:
-      summary: Remuneration Csv
-      operationId: remuneration_csv___fixtures_remuneration_csv_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            text/plain:
               schema:
-                type: string
+                $ref: '#/components/schemas/ItemEnvelope_Compte_'
+        '401':
+          description: Aucun identifiant fourni.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Ressource inconnue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Jeton présent mais invalide, ou paramètre de pagination illisible.
+            **422 et non 401** — c'est ce que fait l'API réelle, et le code de retour
+            est ce sur quoi une logique de retry se décide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Limite de débit atteinte. En-tête `Retry-After` en secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Panne injectée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Panne injectée, transitoire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
-    HTTPValidationError:
+    Agence:
       properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          type: array
-          title: Detail
-      type: object
-      title: HTTPValidationError
-    ValidationError:
-      properties:
-        loc:
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-          type: array
-          title: Location
-        msg:
+        id:
           type: string
-          title: Message
+          title: Id
         type:
           type: string
-          title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
+          title: Type
+          default: agency
+        attributes:
+          $ref: '#/components/schemas/AttributsAgence'
+      additionalProperties: true
       type: object
       required:
-      - loc
-      - msg
+      - id
+      - attributes
+      title: Agence
+    AttributsAgence:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        name:
+          type: string
+          title: Name
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+          x-boond-confidence: unverified
+          x-boond-note: AJOUT DU MOCK. Code court de l'entité (ENT-FR…), utilisé comme
+            clé de périmètre. Le fournisseur expose-t-il un code stable ? À confirmer.
+      additionalProperties: true
+      type: object
+      required:
+      - name
+      title: AttributsAgence
+    AttributsCompte:
+      properties:
+        firstName:
+          type: string
+          title: Firstname
+        lastName:
+          type: string
+          title: Lastname
+        email:
+          type: string
+          title: Email
+      additionalProperties: true
+      type: object
+      required:
+      - firstName
+      - lastName
+      - email
+      title: AttributsCompte
+    AttributsContact:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        firstName:
+          type: string
+          title: Firstname
+        lastName:
+          type: string
+          title: Lastname
+      additionalProperties: true
+      type: object
+      required:
+      - firstName
+      - lastName
+      title: AttributsContact
+    AttributsCra:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        term:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Term
+          x-boond-confidence: unverified
+          x-boond-note: 'Période « AAAA-MM ». Collection non consommée par ophelie
+            : ni le nom d''attribut ni le format ne sont vérifiés.'
+        workedDays:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Workeddays
+          x-boond-confidence: unverified
+          x-boond-note: Idem.
+        businessUnit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Businessunit
+      additionalProperties: true
+      type: object
+      title: AttributsCra
+    AttributsDonneesTechniques:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        references:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: References
+          description: Les expériences du CV. Seul endroit où elles vivent.
+      additionalProperties: true
+      type: object
+      title: AttributsDonneesTechniques
+    AttributsMission:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        startDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Startdate
+          x-boond-confidence: unverified
+          x-boond-note: Nom d'attribut non vérifié — collection non consommée par
+            ophelie.
+        endDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Enddate
+          x-boond-confidence: unverified
+          x-boond-note: Idem. Nul tant que la mission est en cours.
+        businessUnit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Businessunit
+      additionalProperties: true
+      type: object
+      title: AttributsMission
+    AttributsProjet:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        name:
+          type: string
+          title: Name
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      additionalProperties: true
+      type: object
+      required:
+      - name
+      title: AttributsProjet
+    AttributsRessource:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        firstName:
+          type: string
+          title: Firstname
+        lastName:
+          type: string
+          title: Lastname
+        email1:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email1
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        state:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: State
+          description: 1 = actif chez le fournisseur.
+        businessUnit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Businessunit
+        averageDailyPriceExcludingTax:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Averagedailypriceexcludingtax
+          description: 'Tarif de VENTE journalier. À ne pas confondre avec une rémunération
+            : c''est le seul champ monétaire par ressource, et il ne dit rien du salaire.'
+        dateOfHiring:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dateofhiring
+        upn:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Upn
+          x-boond-confidence: unverified
+          x-boond-note: 'AJOUT DU MOCK. Tout le modèle d''autorisation d''insights360
+            est keyé sur l''UPN, et `email1` n''est pas la même chose : dans une organisation
+            réelle, e-mail de contact et UPN Entra divergent. Le mock expose les deux
+            ; le consommateur doit choisir explicitement.'
+        statut:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Statut
+          x-boond-confidence: unverified
+          x-boond-note: AJOUT DU MOCK — `actif` | `sorti`. Le fournisseur expose `state`
+            (entier). Le libellé sert aux cas limites d'insights360 (un partant ne
+            conserve aucune visibilité) ; correspondance à confirmer.
+        managerUpn:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Managerupn
+          x-boond-confidence: unverified
+          x-boond-note: AJOUT DU MOCK. La relation `mainManager` est attestée ; ce
+            doublon par UPN évite au consommateur une résolution d'identifiant pour
+            aplatir la hiérarchie. Les deux sont servis et cohérents.
+      additionalProperties: true
+      type: object
+      required:
+      - firstName
+      - lastName
+      title: AttributsRessource
+    AttributsSociete:
+      properties:
+        updateDate:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedate
+          x-boond-confidence: unverified
+          x-boond-note: 'Curseur du filtre incrémental. L''intégration production
+            d''ophelie ne consomme AUCUN filtre sur horodatage : ni le champ ni le
+            paramètre ne sont attestés. Le pipeline d''insights360 en a pourtant besoin.'
+        isDeleted:
+          type: boolean
+          title: Isdeleted
+          default: false
+          x-boond-confidence: unverified
+          x-boond-note: 'Suppression LOGIQUE. Ajout du mock : un pipeline incrémental
+            en stratégie merge ne peut pas observer une suppression physique sans
+            rafraîchissement complet. Reste à déterminer si BoondManager expose un
+            tel drapeau, et sous quel nom.'
+        name:
+          type: string
+          title: Name
+        businessUnit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Businessunit
+      additionalProperties: true
+      type: object
+      required:
+      - name
+      title: AttributsSociete
+    Compte:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: account
+        attributes:
+          $ref: '#/components/schemas/AttributsCompte'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Compte
+    Contact:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: contact
+        attributes:
+          $ref: '#/components/schemas/AttributsContact'
+        relationships:
+          anyOf:
+          - $ref: '#/components/schemas/RelationsContact'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Contact
+    Cra:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: timesReport
+        attributes:
+          $ref: '#/components/schemas/AttributsCra'
+        relationships:
+          anyOf:
+          - $ref: '#/components/schemas/RelationsCra'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Cra
+    DonneesTechniques:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: technicalData
+        attributes:
+          $ref: '#/components/schemas/AttributsDonneesTechniques'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: DonneesTechniques
+    Erreur:
+      properties:
+        code:
+          type: string
+          title: Code
+          description: Le code HTTP, en chaîne — comme le fait l'API réelle.
+        detail:
+          type: string
+          title: Detail
+      additionalProperties: true
+      type: object
+      required:
+      - code
+      - detail
+      title: Erreur
+    ErrorEnvelope:
+      properties:
+        errors:
+          items:
+            $ref: '#/components/schemas/Erreur'
+          type: array
+          title: Errors
+      additionalProperties: true
+      type: object
+      required:
+      - errors
+      title: ErrorEnvelope
+      description: '`{"errors": [{"code", "detail"}]}`.
+
+
+        Le client d''ophelie lit `errors[0].detail || errors[0].title` : s''écarter
+        de
+
+        cette forme rendrait les erreurs illisibles côté consommateur sans que rien
+
+        n''échoue franchement.'
+    ItemEnvelope_Agence_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Agence'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Agence]
+    ItemEnvelope_Compte_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Compte'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Compte]
+    ItemEnvelope_Contact_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Contact'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Contact]
+    ItemEnvelope_Cra_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Cra'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Cra]
+    ItemEnvelope_DonneesTechniques_:
+      properties:
+        data:
+          $ref: '#/components/schemas/DonneesTechniques'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[DonneesTechniques]
+    ItemEnvelope_Mission_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Mission'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Mission]
+    ItemEnvelope_Projet_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Projet'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Projet]
+    ItemEnvelope_Ressource_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Ressource'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Ressource]
+    ItemEnvelope_Societe_:
+      properties:
+        data:
+          $ref: '#/components/schemas/Societe'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: ItemEnvelope[Societe]
+    ListEnvelope_Agence_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Agence'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Agence]
+    ListEnvelope_Contact_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Contact'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Contact]
+    ListEnvelope_Cra_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Cra'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Cra]
+    ListEnvelope_Mission_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Mission'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Mission]
+    ListEnvelope_Projet_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Projet'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Projet]
+    ListEnvelope_Ressource_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Ressource'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Ressource]
+    ListEnvelope_Societe_:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Societe'
+          type: array
+          title: Data
+        meta:
+          $ref: '#/components/schemas/Meta'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      - meta
+      title: ListEnvelope[Societe]
+    Meta:
+      properties:
+        totals:
+          $ref: '#/components/schemas/Totaux'
+      additionalProperties: true
+      type: object
+      required:
+      - totals
+      title: Meta
+    Mission:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: delivery
+        attributes:
+          $ref: '#/components/schemas/AttributsMission'
+        relationships:
+          anyOf:
+          - $ref: '#/components/schemas/RelationsMission'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Mission
+    Projet:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: project
+        attributes:
+          $ref: '#/components/schemas/AttributsProjet'
+        relationships:
+          anyOf:
+          - $ref: '#/components/schemas/RelationsProjet'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Projet
+    RefDonnee:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+      additionalProperties: true
+      type: object
+      required:
+      - id
       - type
-      title: ValidationError
+      title: RefDonnee
+      description: La référence `{id, type}` d'une relation JSON:API.
+    Relation:
+      properties:
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/RefDonnee'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      title: Relation
+      description: Une relation. `data` peut être nul — un collaborateur sans manager,
+        par exemple.
+    RelationsContact:
+      properties:
+        company:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      title: RelationsContact
+    RelationsCra:
+      properties:
+        resource:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      title: RelationsCra
+    RelationsMission:
+      properties:
+        resource:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+        project:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      title: RelationsMission
+    RelationsProjet:
+      properties:
+        company:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      title: RelationsProjet
+    RelationsRessource:
+      properties:
+        agency:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+        mainManager:
+          anyOf:
+          - $ref: '#/components/schemas/Relation'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      title: RelationsRessource
+    Ressource:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: resource
+        attributes:
+          $ref: '#/components/schemas/AttributsRessource'
+        relationships:
+          anyOf:
+          - $ref: '#/components/schemas/RelationsRessource'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Ressource
+    Societe:
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+          default: company
+        attributes:
+          $ref: '#/components/schemas/AttributsSociete'
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - attributes
+      title: Societe
+    Totaux:
+      properties:
+        rows:
+          type: integer
+          title: Rows
+          description: Nombre total d'éléments AVANT pagination.
+      additionalProperties: true
+      type: object
+      required:
+      - rows
+      title: Totaux

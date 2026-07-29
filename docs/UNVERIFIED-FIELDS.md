@@ -110,7 +110,35 @@ Voir [`adr/0004-compensation-is-not-a-boond-endpoint.md`](adr/0004-compensation-
 C'est probablement aussi la vérité métier : une rémunération vit dans une paie
 ou un SIRH, pas dans l'ERP commercial.
 
-### 6. L'attribut `isDeleted` — **ajout du mock**
+### 6. `code` sur les agences — **ajout du mock**
+
+**Statut** : code court de l'entité (`ENT-FR`, `ENT-BE`, `ENT-LU`).
+
+**Pourquoi** : c'est la clé de périmètre du modèle d'autorisation d'insights360
+(`acl_role_perimetre.entite`). BoondManager expose `name` sur ses agences ; rien
+n'atteste qu'il expose un code court et STABLE, ce qui est pourtant la propriété
+requise — un libellé renommé ne doit pas invalider un périmètre de sécurité.
+
+**À faire** : déterminer quel champ d'agence est stable côté fournisseur. À
+défaut, le mapping entité → code devient un seed versionné de plus, au même
+titre que `acl_role_perimetre`.
+
+### 7. `managerUpn` et `statut` sur les ressources — **ajouts du mock**
+
+**Statut** : deux doublons de commodité, tous deux marqués.
+
+`managerUpn` double la relation `mainManager`, qui est attestée. Il évite au
+consommateur une résolution d'identifiant pour aplatir la hiérarchie. Les deux
+sont servis et cohérents ; le consommateur peut ignorer l'ajout.
+
+`statut` (`actif` | `sorti`) double `state` (entier), qui est attesté. Le libellé
+sert aux cas limites d'insights360 — un employé sorti conserve son historique
+mais perd toute visibilité. **La correspondance entre `state` et ce libellé n'est
+pas vérifiée** : on suppose `state = 1` → actif. C'est le point à confirmer en
+premier, parce qu'une erreur ici retirerait ou accorderait de la visibilité à
+tort.
+
+### 8. L'attribut `isDeleted` — **ajout du mock**
 
 **Statut** : porté par tous les items, à `false` par défaut ; passé à `true` par
 `POST /__admin/delete`.
