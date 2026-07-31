@@ -66,3 +66,6 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-q", "--strict-markers"]
+# The test modules import `tests.conftest`: the repo root must be on sys.path
+# regardless of how pytest is launched (`uv run pytest` does not add the CWD).
+pythonpath = ["."]
