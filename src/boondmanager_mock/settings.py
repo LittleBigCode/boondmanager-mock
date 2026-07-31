@@ -2,9 +2,8 @@
 
 Le mock d'origine lisait ses cinq variables au moment de l'import, ce qui
 rendait impossible d'en changer dans un test sans recharger le module. On les
-centralise ici, dans un objet relu par `reload()`, tout en gardant EXACTEMENT
-les mêmes noms de variables — la migration d'ophelie ne doit toucher aucun
-docker-compose ni aucun values Helm.
+centralise ici, dans un objet relu par `reload()`, en gardant les mêmes noms de
+variables que les déploiements existants.
 """
 
 from __future__ import annotations
@@ -12,13 +11,13 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-# Valeurs par défaut identiques à celles du mock d'origine : le compose
-# d'ophelie et son chart Helm ne fixent que les trois premières.
+# Valeurs par défaut identiques à celles du mock d'origine : les compose et
+# charts existants ne fixent que les trois premières.
 DEFAULTS: dict[str, str] = {
     "BOOND_MOCK_USER_TOKEN": "mock-user-token",
     "BOOND_MOCK_CLIENT_TOKEN": "mock-client-token",
     "BOOND_MOCK_CLIENT_KEY": "mock-client-key",
-    "BOOND_MOCK_BASIC_USER": "demo@ophelie.dev",
+    "BOOND_MOCK_BASIC_USER": "demo@boreal-conseil.example",
     "BOOND_MOCK_BASIC_PASSWORD": "mock-password",
 }
 
@@ -44,24 +43,32 @@ class Settings:
     # qu'en Python. En conteneur, ce n'était plus possible du tout.
     seed: int = 42
 
-    # `ophelie` (gelé, 24 resources) ou `insights360` (50 employés, UPN, cas
-    # limites, deliveries et times-reports).
-    profile: str = "insights360"
-
     # Plan de contrôle /__admin. Fermé par défaut : il n'a de sens qu'en test.
-    # Le déploiement d'ophelie le laisse à false.
     admin_enabled: bool = False
     admin_token: str = "mock-admin-token"
 
-    # Ordre instable par défaut, sauf tri explicite — c'est le comportement que
-    # la spec d'insights360 demande de reproduire. Ce drapeau permet de le
-    # désactiver pour du `curl` exploratoire à la main.
-    stable_order: bool = False
+    # Ordre STABLE par défaut — aligné sur le comportement observé de la vraie
+    # API (2026-07-31). Passer à false (ou injecter `unstable_order`) pour
+    # éprouver un pipeline qui pagine sans tri.
+    stable_order: bool = True
 
-    # absent | csv | stub — cf. docs/adr/0004.
+    # Le nom du tenant annoncé dans `meta.customer`.
+    customer: str = "boreal-conseil"
+
+    # Collections servies en 403 — reproduit un user token à périmètre
+    # restreint (`narrowPerimeter`), tel qu'observé sur le tenant réel.
+    forbidden_collections: frozenset[str] = frozenset()
+
+    # absent | csv — la fixture de rémunération hors /api (cf. README).
     compensation_mode: str = "csv"
 
-    upn_domain: str = "ent.fr"
+    # ── Évolution temporelle (extraction incrémentale) ───────────────────────
+    # Le jeu de données VIT : un événement scripté toutes les
+    # `evolution_interval` secondes (nouvelles actions, staffing/déstaffing,
+    # factures réglées…). Mettre à false — ou l'intervalle à 0 — fige le jeu de
+    # données pour les usages qui exigent un contenu stable à l'octet près.
+    evolution_enabled: bool = True
+    evolution_interval: float = 60.0
 
     max_results_cap: int = 500
     default_max_results: int = 30
@@ -79,12 +86,18 @@ class Settings:
             "BOOND_MOCK_BASIC_PASSWORD", DEFAULTS["BOOND_MOCK_BASIC_PASSWORD"]
         )
         self.seed = int(os.environ.get("BOOND_MOCK_SEED", "42"))
-        self.profile = os.environ.get("BOOND_MOCK_DATASET_PROFILE", "insights360")
         self.admin_enabled = _flag("BOOND_MOCK_ADMIN_ENABLED", False)
         self.admin_token = os.environ.get("BOOND_MOCK_ADMIN_TOKEN", "mock-admin-token")
-        self.stable_order = _flag("BOOND_MOCK_STABLE_ORDER", False)
+        self.stable_order = _flag("BOOND_MOCK_STABLE_ORDER", True)
+        self.customer = os.environ.get("BOOND_MOCK_CUSTOMER", "boreal-conseil")
+        self.forbidden_collections = frozenset(
+            c.strip()
+            for c in os.environ.get("BOOND_MOCK_FORBIDDEN_COLLECTIONS", "").split(",")
+            if c.strip()
+        )
         self.compensation_mode = os.environ.get("BOOND_MOCK_COMPENSATION_MODE", "csv")
-        self.upn_domain = os.environ.get("BOOND_MOCK_UPN_DOMAIN", "ent.fr")
+        self.evolution_enabled = _flag("BOOND_MOCK_EVOLUTION", True)
+        self.evolution_interval = float(os.environ.get("BOOND_MOCK_EVOLUTION_INTERVAL", "60"))
 
 
 settings = Settings()

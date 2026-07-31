@@ -21,7 +21,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-Kind = Literal["rate_limit", "status", "latency", "page_drift", "auth_reject", "stable_order"]
+Kind = Literal["rate_limit", "status", "latency", "page_drift", "auth_reject", "unstable_order"]
 
 
 @dataclass
@@ -158,7 +158,7 @@ _CHAMPS_PAR_KIND: dict[str, set[str]] = {
     "latency": {"seconds"},
     "page_drift": {"after_page", "mode"},
     "auth_reject": {"status"},
-    "stable_order": set(),
+    "unstable_order": set(),
 }
 
 

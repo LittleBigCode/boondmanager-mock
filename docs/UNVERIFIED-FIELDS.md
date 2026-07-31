@@ -1,156 +1,131 @@
 ---
 type: reference
-description: Le registre des champs et endpoints BoondManager que le mock expose sans preuve documentaire — à lever avec le fournisseur.
+description: The registry of gaps between this mock, the official BoondManager documentation, and the real API as observed — what is attested, what is added, what is approximated.
 sources_of_truth:
-  - src/boondmanager_mock/dataset/**
+  - src/boondmanager_mock/models/entities.py
+  - src/boondmanager_mock/dataset/realiste.py
   - src/boondmanager_mock/envelope.py
+  - src/boondmanager_mock/errors.py
+  - src/boondmanager_mock/included.py
 review_triggers:
   - contracts/boondmanager.openapi.yaml
+  - docs/comparisons/
 update_policy: propose
-last_verified: 2026-07-29
+last_verified: 2026-07-31
 ---
 
-# Champs non attestés
+# Gap registry — official RAML × real API × mock
 
-La spécification d'insights360 est catégorique :
+Repository rule: *do not invent BoondManager fields*. Every field flagged
+`x-boond-confidence: unverified` or `invented` in the contract **must** appear
+here — a test enforces it.
 
-> *« Do not invent BoondManager API fields. Mark unknowns `TODO` in the contract
-> and raise them rather than guessing. »*
+## The hierarchy of evidence
 
-Ce fichier est le registre correspondant. Tout champ marqué
-`x-boond-confidence: unverified` ou `invented` dans
-`contracts/boondmanager.openapi.yaml` **doit** y figurer — un test le vérifie,
-pour que l'honnêteté soit une contrainte de build et non une discipline.
+Since v0.3.0 the reference is TWOFOLD, and observation wins:
 
-## Ce qui EST attesté
+1. **Observed on the real API** — a tenant running 9.1.78.1, probed on
+   2026-07-30/31 with an *owner* user token (replayable report:
+   `scripts/compare_real.py`; latest committed run in
+   [`docs/comparisons/`](comparisons/)). The 2026-07-31 report shows **zero
+   structural difference** across the 19 comparable modules, the error dialect
+   and the four profile endpoints.
+2. **Documented in the official RAML** (https://doc.boondmanager.com/api-externe/,
+   `raml-build/`) — used where the real API showed nothing (module empty on
+   the tenant, permissions).
 
-Ces éléments viennent d'une intégration production vérifiée (ophelie,
-`docs/adr/0002-boondmanager-scheduled-ingestion.md`) et ne sont pas en question :
+## Attested by OBSERVATION (the bulk of the mock)
 
-- l'en-tête `X-Jwt-Client-Boondmanager`, HS256, base64url sans padding, payload
-  `{"userToken","clientToken"}` ; le 422 sur signature invalide ;
-- l'enveloppe `{"data": […], "meta": {"totals": {"rows": N}}}` ;
-- la pagination `page` / `maxResults`, plafond 500 ;
-- le filtre `keywords` ;
-- les collections `resources`, `companies`, `contacts`, `projects`, `agencies`,
-  le sous-onglet `resources/{id}/technical-data`, et `application/current-user` ;
-- les noms d'attributs consommés par le pipeline d'ophelie (`firstName`,
-  `lastName`, `email1`, `businessUnit`, `averageDailyPriceExcludingTax`, …).
+- paths, methods and cardinalities: 20 searchable collections; `/absences`,
+  `/expenses`, `/times` without a profile endpoint; **`GET /contracts` and
+  `GET /deliveries` answering 405** (observed);
+- the envelope: full `meta` (`version`, `androidMinVersion`, `iosMinVersion`,
+  `isLogged`, `language`, `timestamp`, `login`, `customer`, `totals.rows`) +
+  PER-MODULE keys (`solr`, `conditionalFields`, `resetCache`,
+  `hasOpportunityAlerts`); per-module `included` reduced shapes as observed;
+- **the entire error dialect**: `meta` present even on errors (outside a
+  session: `isLogged:false`/`"en"`), entries `{status, code, detail,
+  title|source}`, `HTTP {code} ({method} {path})` messages,
+  `422 - Signature verification failed` + `source.parameter: xJwtClient`,
+  1017 + `source.parameter` per missing parameter on `times-reports`;
+- identifiers: numeric strings everywhere, **composite on `/times`**
+  (`regular_1`, `exceptional_…`);
+- `times-reports`: the `startMonth`/`endMonth` window is REQUIRED;
+- the profile endpoints `resources/{id}` (18 attributes, `contracts`
+  relationship), `contracts/{id}`, `resources/{id}/administrative`,
+  `resources/{id}/technical-data` (type `resource`) — all at zero difference;
+- default ordering is STABLE; `sort=updateDate` and `period=updated|created`.
 
-## Ce qui NE l'est PAS
+## The RAML × observed matrix
 
-### 1. Le paramètre de filtre incrémental — `unverified`
+Fields DOCUMENTED in the RAML that the real API never returned (even with the
+owner token) — the mock no longer emits them:
 
-**Statut** : le mock accepte **deux** formes, `updatedSince=<ISO8601>` et
-`filter[updateDate][gte]=<ISO8601>`.
+| Module | RAML fields never observed |
+|---|---|
+| CRM searches (resources, candidates, companies, contacts, opportunities) | `creationSource` (present only on the resources PROFILE) |
+| companies | `numberbOfActiveOpportunity` (documented typo field, never served) |
+| resources (search) | `icSince`, `icStatus` — the bench is read through `availability: "immediate"` |
+| orders | `billableItemTypes`, `requestTimesheetsSignature` |
+| contracts (profile) | `probationEndDate`, `renewalProbationEndDate`, `exceptionalScales`, `contractAverageDailyProductionCost`, `forceContractAverageDailyProductionCost` |
+| times | `endDate`, `updateDate` |
+| absences, roles, times-reports, agencies, poles, business-units, banking-transactions, expenses | `updateDate` |
 
-**Pourquoi** : l'ADR-0002 d'ophelie documente le dialecte depuis la production
-et ne mentionne **aucun** filtre sur horodatage — seulement `page`,
-`maxResults` et `keywords`. Le pipeline d'insights360 est pourtant incrémental
-par conception (« Never full-refresh in the scheduled path »), donc il lui en
-faut un.
+Gaps the mock KEEPS deliberately (tolerated by `compare_real.py`):
 
-**Coût de la correction** : une ligne. Le nom est une constante unique côté
-consommateur — `insights360:extract/src/insights360_extract/boondmanager/client.py::UPDATED_SINCE_PARAM`
-— et un test vérifie via `/__admin/state` que le paramètre est bien **envoyé**,
-pas seulement toléré.
+| Gap | Why |
+|---|---|
+| `orders.creationDate` / `orders.updateDate` | documented in the RAML, and the official `period=updated` incremental cursor on orders needs them — the observed tenant did not return them (version?) |
+| `expenses`: `row`, `numberOfKilometers`, `delivery`, `project` always emitted | the real API OMITS empty keys item by item (sparse emission); the mock emits the full RAML shape whenever the value exists |
+| `isDeleted` everywhere | mock marker (see below) |
 
-**À faire** : confirmer le nom réel dans la documentation du tenant
-BoondManager, ou auprès du support. Retirer alors la forme non retenue.
+## Still unattested
 
-### 2. L'attribut `updateDate` — `unverified`
+### 1. `isDeleted` — **mock addition** (`unverified`)
 
-**Statut** : porté par tous les items de toutes les collections.
+Carried by every item; set to `true` by `POST /__admin/delete`. An incremental
+pipeline running a `merge` strategy cannot observe a physical deletion. No
+equivalent field exists at the vendor. Profile projections do not carry it —
+the flag is read on searches.
 
-**Pourquoi** : corollaire du point 1 — un curseur incrémental a besoin d'un
-champ sur lequel s'appuyer. Le nom est plausible (BoondManager expose
-`updateDate` sur plusieurs entités) mais n'est pas attesté par l'intégration
-d'ophelie, qui ne l'utilise pas.
+### 2. `updatedSince` / `filter[updateDate][gte]` — **mock affordance**
 
-### 3. L'attribut `upn` — **ajout du mock, pas un champ fournisseur**
+The official way is `period=updated` (DAY granularity). These two parameters
+offer a finer cursor that no documentation attests — they only apply to
+modules that expose `updateDate`.
 
-**Statut** : ajouté délibérément, marqué comme tel.
+### 3. Values of per-module meta keys and of included-only attributes
 
-**Pourquoi** : tout le modèle d'autorisation d'insights360 est keyé sur l'UPN
-(`dim_collaborateur.upn` unique et non nul, `acl_utilisateur.upn`, le prédicat
-`USERPRINCIPALNAME()` de Power BI). BoondManager expose `email1`, qui n'est pas
-la même chose : dans une organisation réelle, l'e-mail de contact et l'UPN Entra
-divergent.
+`solr`, `conditionalFields`, `resetCache`, `hasOpportunityAlerts` (meta) and
+`canReadCompany`, `canReadContact`, `invoicesLockingStates`, `workUnitRate`
+(included): the KEYS are observed, the VALUES served are plausible (`true`,
+`[]`, `1`…) — the exact content is not documented.
 
-**Décision** : le mock expose les deux, `email1` et `upn`, avec la même valeur
-par défaut. Le pipeline doit décider explicitement lequel il consomme, et cette
-décision doit être documentée côté insights360 plutôt qu'implicite.
+### 4. Dictionary integer semantics
 
-### 4. Les collections `deliveries` et `times-reports` — `unverified`
+`typeOf`, `state`, `civility`, `currency`…: their meaning is per-instance
+(`/application/dictionary`). Values are plausible; the exact mapping is not
+attested. Never encode a business rule on these integers without the target
+tenant's dictionary.
 
-**Statut** : implémentées, avec des attributs plausibles
-(`startDate`/`endDate`/`businessUnit` ; `term`/`workedDays`).
+### 5. Profile endpoints of secondary modules
 
-**Pourquoi** : insights360 en a besoin pour `fct_mission` et `fct_cra`.
-BoondManager possède bien ces notions, mais l'intégration d'ophelie ne les
-consomme pas — les noms d'attributs exacts ne sont donc pas vérifiés.
+Only resources, projects, contracts, administrative and technical-data have a
+profile projection VERIFIED against the real API. The other profile endpoints
+(`/invoices/{id}`, `/candidates/{id}`…) serve the search shape — verify them
+if a consumer starts relying on them.
 
-**À faire** : aligner sur la documentation avant la première extraction réelle.
-La forme de l'enveloppe et la pagination, elles, sont attestées : seuls les noms
-d'attributs sont en question.
+### 6. Synthetic civil status
 
-### 5. La rémunération — **pas un endpoint BoondManager du tout**
+`dateOfBirth`, `nationality`, seniority… in the administrative tab and the
+resource profile: official keys, FABRICATED deterministic values.
 
-**Statut** : servie sur `/__fixtures/remuneration.csv`, délibérément **hors de
-`/api`**.
+### 7. Compensation outside `/api`
 
-**Pourquoi** : aucun endpoint de rémunération par ressource n'est attesté. Le
-seul champ monétaire par ressource est `averageDailyPriceExcludingTax`, qui est
-un **tarif de vente**, pas un salaire. Inventer un endpoint aurait gravé une
-fiction dans le contrat, le schéma, l'ADR et les tests de sécurité à la fois —
-et `fct_remuneration` est justement la table la plus sensible du modèle.
+`/__fixtures/remuneration.csv` — a convenience view derived from the official
+`monthlySalary` field of `/contracts/{id}`.
 
-Voir [`adr/0004-compensation-is-not-a-boond-endpoint.md`](adr/0004-compensation-is-not-a-boond-endpoint.md).
+### 8. Time evolution — a mock affordance, not vendor behaviour
 
-C'est probablement aussi la vérité métier : une rémunération vit dans une paie
-ou un SIRH, pas dans l'ERP commercial.
-
-### 6. `code` sur les agences — **ajout du mock**
-
-**Statut** : code court de l'entité (`ENT-FR`, `ENT-BE`, `ENT-LU`).
-
-**Pourquoi** : c'est la clé de périmètre du modèle d'autorisation d'insights360
-(`acl_role_perimetre.entite`). BoondManager expose `name` sur ses agences ; rien
-n'atteste qu'il expose un code court et STABLE, ce qui est pourtant la propriété
-requise — un libellé renommé ne doit pas invalider un périmètre de sécurité.
-
-**À faire** : déterminer quel champ d'agence est stable côté fournisseur. À
-défaut, le mapping entité → code devient un seed versionné de plus, au même
-titre que `acl_role_perimetre`.
-
-### 7. `managerUpn` et `statut` sur les ressources — **ajouts du mock**
-
-**Statut** : deux doublons de commodité, tous deux marqués.
-
-`managerUpn` double la relation `mainManager`, qui est attestée. Il évite au
-consommateur une résolution d'identifiant pour aplatir la hiérarchie. Les deux
-sont servis et cohérents ; le consommateur peut ignorer l'ajout.
-
-`statut` (`actif` | `sorti`) double `state` (entier), qui est attesté. Le libellé
-sert aux cas limites d'insights360 — un employé sorti conserve son historique
-mais perd toute visibilité. **La correspondance entre `state` et ce libellé n'est
-pas vérifiée** : on suppose `state = 1` → actif. C'est le point à confirmer en
-premier, parce qu'une erreur ici retirerait ou accorderait de la visibilité à
-tort.
-
-### 8. L'attribut `isDeleted` — **ajout du mock**
-
-**Statut** : porté par tous les items, à `false` par défaut ; passé à `true` par
-`POST /__admin/delete`.
-
-**Pourquoi** : un pipeline incrémental en stratégie `merge` **ne peut pas**
-observer une suppression physique sans rafraîchissement complet. Le mock
-n'expose donc que la suppression logique, parce que c'est le seul cas qu'un
-pipeline incrémental peut réellement traiter — et parce que prétendre le
-contraire est exactement comment les tables ACL continuent d'accorder l'accès à
-des partants.
-
-**À faire** : déterminer si BoondManager expose un drapeau de suppression, et
-sous quel nom. Si le fournisseur ne fait que des suppressions physiques, la
-politique documentée côté insights360 (réconciliation par rafraîchissement
-complet hebdomadaire) devient obligatoire, pas optionnelle.
+The dataset evolves (see `evolution.py`). `BOOND_MOCK_EVOLUTION=false`
+freezes everything. The real API moves because humans are working.

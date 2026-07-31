@@ -19,14 +19,11 @@ L'honnêteté devient ainsi une contrainte de build, pas une bonne intention.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
-
-os.environ.setdefault("BOOND_MOCK_DATASET_PROFILE", "insights360")
 
 import boondmanager_mock as mock
 
@@ -73,9 +70,15 @@ def test_le_contrat_porte_de_vraies_formes(genere: dict[str, Any]) -> None:
     par inadvertance — en ajoutant une route non typée, par exemple.
     """
     schemas = genere.get("components", {}).get("schemas", {})
-    assert len(schemas) > 20, f"seulement {len(schemas)} schémas — les routes sont-elles typées ?"
+    assert len(schemas) > 40, f"seulement {len(schemas)} schémas — les routes sont-elles typées ?"
 
-    for chemin in ("/api/resources", "/api/deliveries", "/api/times-reports"):
+    for chemin in (
+        "/api/resources",
+        "/api/invoices",
+        "/api/times",
+        "/api/absences",
+        "/api/banking-transactions",
+    ):
         contenu = genere["paths"][chemin]["get"]["responses"]["200"]["content"]
         schema = contenu["application/json"]["schema"]
         assert "$ref" in schema or "allOf" in schema, (
@@ -120,8 +123,9 @@ def test_tout_champ_non_verifie_est_inscrit_au_registre(genere: dict[str, Any]) 
     marques = _champs_marques(schemas, "unverified")
     assert marques, (
         "AUCUN champ marqué `unverified`. Ce serait une bonne nouvelle si le "
-        "dialecte était intégralement attesté — il ne l'est pas (updateDate, "
-        "upn, deliveries, times-reports…). Le marquage a-t-il été retiré ?"
+        "dialecte était intégralement attesté — il ne l'est pas (isDeleted, "
+        "updateDate sur les modules qui ne le documentent pas…). Le marquage "
+        "a-t-il été retiré ?"
     )
 
     registre = REGISTRE.read_text(encoding="utf-8")

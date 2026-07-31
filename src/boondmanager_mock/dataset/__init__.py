@@ -1,8 +1,7 @@
-"""Profils de jeux de données.
+"""Le jeu de données du mock.
 
-`ophelie`    — reproduction GELÉE de l'historique (24 resources). Ne pas modifier.
-`insights360` — 50 collaborateurs, UPN, huit cas limites, deliveries et CRA.
-
-Le découplage par profil est ce qui permet aux deux dépôts consommateurs
-d'évoluer à des cadences différentes sans se casser mutuellement.
+UN SEUL profil : `realiste` — « Boréal Conseil », ESN française cohérente de
+bout en bout (RH, CRM, production, facturation, banque). Les anciens profils
+`ophelie` et `insights360` ont été supprimés au profit de ce jeu unique,
+aligné sur les schémas officiels du fournisseur.
 """

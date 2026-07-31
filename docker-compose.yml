@@ -1,0 +1,30 @@
+# Local deployment in one command:
+#
+#     docker compose up --build
+#
+# The mock answers on http://localhost:8000:
+#     curl http://localhost:8000/health
+#     curl -H "X-Jwt-Client-Boondmanager: <jwt>" http://localhost:8000/api/resources
+#
+# The JWT is built from the default tokens (HS256, base64url without padding,
+# payload {"userToken","clientToken"}) — or in Python:
+#     python -c "from boondmanager_mock import build_client_jwt; \
+#                print(build_client_jwt('mock-user-token','mock-client-token','mock-client-key'))"
+#
+# `depends_on: condition: service_healthy` works on the consumer side: the
+# healthcheck ships INSIDE the image.
+services:
+  boondmanager-mock:
+    build: .
+    image: boondmanager-mock:0.3.0
+    ports:
+      - "8000:8000"
+    environment:
+      # Failure-injection and clock control plane — essential outside the process.
+      BOOND_MOCK_ADMIN_ENABLED: "true"
+      # Company life advances one event per minute (incremental extraction).
+      # Set to "false" for a byte-stable dataset.
+      BOOND_MOCK_EVOLUTION: "true"
+      BOOND_MOCK_EVOLUTION_INTERVAL: "60"
+      # Dataset seed — the same seed produces the same world.
+      BOOND_MOCK_SEED: "42"

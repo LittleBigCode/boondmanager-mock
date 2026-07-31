@@ -48,11 +48,11 @@ def invented(description: str) -> dict[str, Any]:
 
 
 class Permissif(BaseModel):
-    """Base commune : accepte les champs inconnus plutôt que de les rejeter.
+    """Common base: unknown fields are accepted rather than rejected.
 
-    Un modèle strict transformerait toute évolution de l'API réelle en panne du
-    mock. Ce n'est pas ce qu'on veut : le mock décrit ce que nous consommons,
-    pas l'exhaustivité de ce que BoondManager expose.
+    A strict model would turn every evolution of the real API into a mock
+    outage. The models describe what is emitted, not everything BoondManager
+    may expose.
     """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
@@ -62,62 +62,88 @@ class Permissif(BaseModel):
 
 
 class RefDonnee(Permissif):
-    """La référence `{id, type}` d'une relation JSON:API."""
+    """The `{id, type}` reference of a JSON:API relationship."""
 
     id: str
     type: str
 
 
 class Relation(Permissif):
-    """Une relation. `data` peut être nul — un collaborateur sans manager, par exemple."""
+    """A relationship. `data` may be null — an employee without a manager, say."""
 
     data: RefDonnee | None = None
 
 
 class Totaux(Permissif):
-    rows: int = Field(description="Nombre total d'éléments AVANT pagination.")
+    rows: int = Field(description="Total number of items BEFORE pagination.")
 
 
 class Meta(Permissif):
+    """The list `meta`, as the official schema describes it: `totals.rows`
+    plus the server version, session state and language."""
+
     totals: Totaux
+    version: str | None = Field(default=None, description="BoondManager version.")
+    isLogged: bool | None = None
+    language: str | None = Field(default=None, description="fr | en | es")
+
+
+class MetaDetail(Permissif):
+    """The profile `meta` — same as the list one, without `totals`."""
+
+    version: str | None = None
+    isLogged: bool | None = None
+    language: str | None = None
 
 
 class ListEnvelope[T](BaseModel):
-    """`{"data": [...], "meta": {"totals": {"rows": N}}}` — l'enveloppe de liste.
+    """`{"data": [...], "included": [...], "meta": {...}}` — the list envelope.
 
-    `meta.totals.rows` compte AVANT pagination : c'est ce qui permet au client de
-    savoir quand s'arrêter. Un client qui s'arrêterait sur « page vide » ferait
-    une requête de trop à chaque exécution.
+    `meta.totals.rows` counts BEFORE pagination: it is what lets a client know
+    when to stop. A client stopping on "empty page" would issue one request
+    too many on every run.
+
+    `included` carries related entities in reduced shape (agency → `name`,
+    resource → `firstName`/`lastName`…), like the real API. Absent from
+    modules whose official schema does not declare it (absences, expenses,
+    agencies, poles, roles).
     """
 
     model_config = ConfigDict(extra="allow")
 
     data: list[T]
+    included: list[dict[str, Any]] | None = Field(
+        default=None, description="Related entities, reduced per-module shape."
+    )
     meta: Meta
 
 
 class ItemEnvelope[T](BaseModel):
-    """`{"data": {...}}` — l'enveloppe de détail."""
+    """`{"data": {...}, "included": [...], "meta": {...}}` — the profile envelope."""
 
     model_config = ConfigDict(extra="allow")
 
     data: T
+    included: list[dict[str, Any]] | None = None
+    meta: MetaDetail | None = None
 
 
 # ── Erreurs ──────────────────────────────────────────────────────────────────
 
 
 class Erreur(Permissif):
-    code: str = Field(description="Le code HTTP, en chaîne — comme le fait l'API réelle.")
+    """One error entry — the real dialect: `status`/`code`/`detail` plus
+    either `title` or `source.parameter`."""
+
+    code: str = Field(description="HTTP or business code, as a string — like the real API.")
     detail: str
 
 
 class ErrorEnvelope(BaseModel):
-    """`{"errors": [{"code", "detail"}]}`.
+    """`{"meta": {...}, "errors": [{status, code, detail, title|source}]}`.
 
-    Le client d'ophelie lit `errors[0].detail || errors[0].title` : s'écarter de
-    cette forme rendrait les erreurs illisibles côté consommateur sans que rien
-    n'échoue franchement.
+    The real API keeps `meta` even on errors (with `isLogged:false` outside a
+    session). Consumers typically read `errors[0].detail || errors[0].title`.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -128,26 +154,25 @@ class ErrorEnvelope(BaseModel):
 # Réponses d'erreur déclarées sur chaque route : elles apparaissent au contrat
 # sans passer par `response_model`, qui ne décrit que le cas nominal.
 REPONSES_ERREUR: dict[int | str, dict[str, Any]] = {
-    401: {"model": ErrorEnvelope, "description": "Aucun identifiant fourni."},
-    404: {"model": ErrorEnvelope, "description": "Ressource inconnue."},
+    401: {"model": ErrorEnvelope, "description": "No credentials provided."},
+    404: {"model": ErrorEnvelope, "description": "Unknown entity."},
     422: {
         "model": ErrorEnvelope,
         "description": (
-            "Jeton présent mais invalide, ou paramètre de pagination illisible. "
-            "**422 et non 401** — c'est ce que fait l'API réelle, et le code de "
-            "retour est ce sur quoi une logique de retry se décide."
+            "Token present but invalid, missing required parameter (business "
+            "code 1017), or unreadable pagination parameter. **422, not 401** — "
+            "that is what the real API does, and the status code is what retry "
+            "logic keys on."
         ),
     },
     429: {
         "model": ErrorEnvelope,
-        "description": "Limite de débit atteinte. En-tête `Retry-After` en secondes.",
+        "description": "Rate limit reached. `Retry-After` header in seconds.",
     },
-    500: {"model": ErrorEnvelope, "description": "Panne injectée."},
-    503: {"model": ErrorEnvelope, "description": "Panne injectée, transitoire."},
+    500: {"model": ErrorEnvelope, "description": "Injected failure."},
+    503: {"model": ErrorEnvelope, "description": "Injected transient failure."},
 }
 
 # Paramètres de requête partagés par toutes les collections.
-ParamPage = Annotated[int, Field(ge=1, description="Numéro de page, base 1.")]
-ParamMaxResults = Annotated[
-    int, Field(ge=1, le=500, description="Taille de page. Défaut 30, plafond 500.")
-]
+ParamPage = Annotated[int, Field(ge=1, description="Page number, 1-based.")]
+ParamMaxResults = Annotated[int, Field(ge=1, le=500, description="Page size. Default 30, cap 500.")]

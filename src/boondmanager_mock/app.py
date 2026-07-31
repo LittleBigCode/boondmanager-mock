@@ -4,16 +4,32 @@ Un SEUL point de dispatch pour les pannes (`_dispatch_injections`), évalué ava
 l'authentification pour que `auth_reject` puisse préempter. Toute route de
 collection passe par lui : il ne peut donc pas y avoir de route « oubliée » où
 les pannes ne s'appliqueraient pas.
+
+La surface reproduit les modules du fournisseur, CONFRONTÉE à la vraie API
+(tenant réel, version 9.1.78.1, relevés des 2026-07-30/31) :
+
+  • 20 collections interrogeables en liste — `/absences`, `/expenses` et
+    `/times` sans détail `/{id}`, comme en réel ;
+  • `GET /contracts` et `GET /deliveries` (listes) répondent **405**, comme en
+    réel — les données se récupèrent par `/{id}` et par les relations
+    (`resources/{id}` → `contracts`, `purchases` → `delivery`, `times` →
+    `delivery`…) ;
+  • `times-reports` EXIGE `startMonth`/`endMonth` (422 code métier 1017) ;
+  • les DÉTAILS servent les formes *profile* officielles quand elles sont
+    attestées (resources, projects, contracts, technical-data, administrative) ;
+  • les routes inconnues rendent l'enveloppe d'erreur Boond, pas le 404 FastAPI.
 """
 
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth import basic_is_valid, jwt_is_valid
 from .envelope import (
@@ -21,25 +37,44 @@ from .envelope import (
     apply_keywords,
     apply_order,
     apply_page_drift,
+    apply_period,
     envelope,
+    envelope_detail,
     extract_since,
     paginate,
 )
-from .errors import error
+from .errors import entree_erreur, error, reponse_erreurs
+from .included import construire_included
 from .injection import engine
 from .models import (
     REPONSES_ERREUR,
+    Absence,
+    Achat,
+    ActionCrm,
+    AdministratifRessource,
     Agence,
-    Compte,
+    Candidat,
+    Commande,
     Contact,
+    Contrat,
     Cra,
     DonneesTechniques,
+    Facture,
+    Frais,
     ItemEnvelope,
     ListEnvelope,
     Mission,
+    Opportunite,
+    Paiement,
+    Pole,
     Projet,
     Ressource,
+    Role,
     Societe,
+    Temps,
+    TransactionBancaire,
+    UniteOperationnelle,
+    UtilisateurCourant,
 )
 from .settings import settings
 from .state import state
@@ -57,31 +92,103 @@ class CollectionSpec:
     chemin: str  # segment d'URL — `times-reports` porte un tiret
     cle_dataset: str  # clé dans le dict du jeu de données
     modele: type  # modèle pydantic de l'élément
-    singulier: str  # pour le message 404
+    singulier: str  # nom d'entité au singulier (documentation)
+    avec_detail: bool = True  # /absences, /expenses et /times sont search-only
+    avec_included: bool = True  # les modules sans `included` au schéma officiel
+    liste_405: bool = False  # GET liste absent en réel (contracts, deliveries)
+    parametres_obligatoires: tuple[str, ...] = ()  # 422 code 1017 sinon
+    meta_extra: tuple[str, ...] = ()  # clés meta propres au module (relevé réel)
+
+
+#: Valeurs des clés meta par module — CLÉS observées en réel, valeurs plausibles
+#: (le contenu exact n'est pas documenté ; cf. docs/UNVERIFIED-FIELDS.md).
+META_EXTRAS: dict[str, Any] = {
+    "solr": True,
+    "conditionalFields": [],
+    "resetCache": False,
+    "hasOpportunityAlerts": False,
+}
 
 
 COLLECTIONS: tuple[CollectionSpec, ...] = (
-    CollectionSpec("resources", "resources", Ressource, "resource"),
-    CollectionSpec("companies", "companies", Societe, "company"),
-    CollectionSpec("contacts", "contacts", Contact, "contact"),
+    CollectionSpec(
+        "absences", "absences", Absence, "absence", avec_detail=False, avec_included=False
+    ),
+    CollectionSpec("actions", "actions", ActionCrm, "action", meta_extra=("solr",)),
+    CollectionSpec(
+        "agencies", "agencies", Agence, "agency", avec_included=False, meta_extra=("resetCache",)
+    ),
+    CollectionSpec(
+        "banking-transactions", "banking_transactions", TransactionBancaire, "bankingTransaction"
+    ),
+    CollectionSpec("business-units", "business_units", UniteOperationnelle, "businessUnit"),
+    CollectionSpec(
+        "candidates",
+        "candidates",
+        Candidat,
+        "candidate",
+        meta_extra=("conditionalFields", "solr"),
+    ),
+    CollectionSpec(
+        "companies", "companies", Societe, "company", meta_extra=("conditionalFields", "solr")
+    ),
+    CollectionSpec(
+        "contacts", "contacts", Contact, "contact", meta_extra=("conditionalFields", "solr")
+    ),
+    CollectionSpec("contracts", "contracts", Contrat, "contract", liste_405=True),
+    CollectionSpec("deliveries", "deliveries", Mission, "delivery", liste_405=True),
+    CollectionSpec(
+        "expenses", "expenses", Frais, "expense", avec_detail=False, avec_included=False
+    ),
+    CollectionSpec("invoices", "invoices", Facture, "invoice"),
+    CollectionSpec(
+        "opportunities",
+        "opportunities",
+        Opportunite,
+        "opportunity",
+        meta_extra=("conditionalFields", "hasOpportunityAlerts", "solr"),
+    ),
+    CollectionSpec("orders", "orders", Commande, "order"),
+    CollectionSpec("payments", "payments", Paiement, "payment"),
+    CollectionSpec("poles", "poles", Pole, "pole", avec_included=False),
     CollectionSpec("projects", "projects", Projet, "project"),
-    CollectionSpec("agencies", "agencies", Agence, "agency"),
-    CollectionSpec("deliveries", "deliveries", Mission, "delivery"),
-    CollectionSpec("times-reports", "times_reports", Cra, "timesReport"),
+    CollectionSpec("purchases", "purchases", Achat, "purchase"),
+    CollectionSpec(
+        "resources", "resources", Ressource, "resource", meta_extra=("conditionalFields", "solr")
+    ),
+    CollectionSpec("roles", "roles", Role, "role", avec_included=False),
+    CollectionSpec("times", "times", Temps, "time", avec_detail=False),
+    CollectionSpec(
+        "times-reports",
+        "times_reports",
+        Cra,
+        "timesReport",
+        parametres_obligatoires=("startMonth", "endMonth"),
+    ),
 )
 
 
 def _check_auth(request: Request) -> JSONResponse | None:
-    """401 sans identifiants, **422** avec un JWT invalide — comme la vraie API."""
+    """401 sans identifiants, **422** avec un JWT invalide — formes réelles.
+
+    Le 422 réel : `"422 - Signature verification failed"` avec
+    `source: {"parameter": "xJwtClient"}`, et un meta HORS SESSION
+    (`isLogged: false`, `language: "en"`).
+    """
     jwt_token = request.headers.get("X-Jwt-Client-Boondmanager")
     if jwt_token is not None:
         if jwt_is_valid(jwt_token):
             return None
-        return error(422, "Signature verification failed")
+        return error(
+            422,
+            "422 - Signature verification failed",
+            source={"parameter": "xJwtClient"},
+            connecte=False,
+        )
     authorization = request.headers.get("Authorization", "")
     if authorization.startswith("Basic ") and basic_is_valid(authorization[6:]):
         return None
-    return error(401, "Authentication required")
+    return error(401, request=request, connecte=False)
 
 
 def _dispatch_injections(path: str, params: dict[str, str]) -> JSONResponse | None:
@@ -92,11 +199,16 @@ def _dispatch_injections(path: str, params: dict[str, str]) -> JSONResponse | No
       2. latency      — s'applique même quand la requête finit par réussir ;
       3. rate_limit   — dépend du compteur, donc après l'observation ;
       4. status       — la panne franche.
+
+    C'est aussi ici que la vie de l'entreprise avance : chaque requête donne à
+    l'évolution temporelle l'occasion d'appliquer les événements devenus dus
+    (`engine.now()` intègre l'horloge virtuelle de /__admin/clock).
     """
+    state.avancer_evolution(engine.now())
     index = engine.observe(path, params)
 
     if (rule := engine.first("auth_reject", path)) is not None and rule.consume():
-        return error(rule.status or 401, "Authentication required")
+        return error(rule.status or 401, f"HTTP {rule.status or 401} (GET {path})", connecte=False)
 
     if (rule := engine.first("latency", path)) is not None and rule.consume():
         # Un vrai `sleep` : c'est le seul moyen d'éprouver un timeout côté
@@ -109,8 +221,7 @@ def _dispatch_injections(path: str, params: dict[str, str]) -> JSONResponse | No
         and rule.consume()
     ):
         # `Retry-After` en secondes, comme la vraie API. Un client qui l'ignore
-        # et retente immédiatement doit continuer à recevoir des 429 — c'est ce
-        # que teste insights360.
+        # et retente immédiatement doit continuer à recevoir des 429.
         return error(
             429,
             "Too many requests",
@@ -124,21 +235,69 @@ def _dispatch_injections(path: str, params: dict[str, str]) -> JSONResponse | No
 
 
 def _collection_items(dataset_key: str) -> list[dict[str, Any]]:
-    return state.dataset.get(dataset_key, [])
+    items: list[dict[str, Any]] = state.dataset.get(dataset_key, [])
+    return items
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Application
 # ─────────────────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="BoondManager mock", version="0.1.0", docs_url="/docs")
+app = FastAPI(title="BoondManager mock", version="0.3.0", docs_url="/docs")
 api = APIRouter(prefix="/api")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _erreur_http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Routes et méthodes inconnues : l'enveloppe Boond, pas le 404 FastAPI.
+
+    Comportement réel relevé : `/times/{id}` → 404 enveloppé, `GET /deliveries`
+    → 405 enveloppé — avec un meta HORS SESSION (le routage précède l'auth).
+    """
+    if exc.status_code in (404, 405):
+        return error(exc.status_code, request=request, connecte=False)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
-    """Non authentifié — c'est une sonde, pas une ressource."""
+    """Unauthenticated — it is a probe, not an entity."""
     return {"status": "ok", "service": "boondmanager-mock"}
+
+
+def _parametres_manquants(spec: CollectionSpec, params: dict[str, str]) -> JSONResponse | None:
+    """La fenêtre obligatoire de `times-reports` — 422 code métier 1017.
+
+    Forme réelle : une entrée d'erreur PAR paramètre manquant, chacune avec
+    `source: {"parameter": ...}` (ordre alphabétique observé)."""
+    manquants = sorted(p for p in spec.parametres_obligatoires if p not in params)
+    if not manquants:
+        return None
+    return reponse_erreurs(
+        422,
+        [
+            entree_erreur(
+                422,
+                "1017 - Missing required attribute",
+                code="1017",
+                source={"parameter": nom},
+            )
+            for nom in manquants
+        ],
+    )
+
+
+def _garde_apres_auth(
+    request: Request, spec: CollectionSpec, params: dict[str, str]
+) -> JSONResponse | None:
+    """Les refus post-authentification, dans l'ordre observé en réel :
+    périmètre restreint (403), panne historique en process, fenêtre obligatoire."""
+    if spec.chemin in settings.forbidden_collections:
+        # BOOND_MOCK_FORBIDDEN_COLLECTIONS — le 403 d'un user token `narrowPerimeter`.
+        return error(403, request=request)
+    if spec.cle_dataset in state.fail_collections or spec.chemin in state.fail_collections:
+        return error(500, f"mock: simulated outage on /{spec.chemin}")
+    return _parametres_manquants(spec, params)
 
 
 def _paginated(request: Request, spec: CollectionSpec) -> JSONResponse:
@@ -150,12 +309,16 @@ def _paginated(request: Request, spec: CollectionSpec) -> JSONResponse:
         return injected
     if (denied := _check_auth(request)) is not None:
         return denied
-    # Levier d'injection historique, conservé pour la suite de tests d'ophelie.
-    if dataset_key in state.fail_collections or path_name in state.fail_collections:
-        return error(500, f"mock: simulated outage on /{path_name}")
+    if (refuse := _garde_apres_auth(request, spec, params)) is not None:
+        return refuse
 
     items = _collection_items(dataset_key)
-    items = apply_keywords(items, params.get("keywords", ""))
+    if spec.chemin == "times-reports":
+        # La fenêtre de termes est OBLIGATOIRE et effective (format AAAA-MM).
+        debut, fin = params["startMonth"], params["endMonth"]
+        items = [i for i in items if debut <= i["attributes"].get("term", "") <= fin]
+    items = apply_keywords(items, params.get("keywords", ""), state.blobs(dataset_key))
+    items = apply_period(items, params)
     items = apply_incremental(items, extract_since(params))
 
     total = len(items)
@@ -165,9 +328,132 @@ def _paginated(request: Request, spec: CollectionSpec) -> JSONResponse:
     if paged is None:
         return error(422, "Wrong or missing attribute: page/maxResults")
     slice_, page, page_size = paged
-    slice_ = apply_page_drift(slice_, page, page_size, path)
+    if (drift := apply_page_drift(items, page, page_size, path)) is not None:
+        slice_ = drift
 
-    return JSONResponse(envelope(slice_, total))
+    included = (
+        construire_included(slice_, state.dataset, dataset_key, state.index_entites())
+        if spec.avec_included
+        else None
+    )
+    extras = {cle: META_EXTRAS[cle] for cle in spec.meta_extra}
+    return JSONResponse(envelope(slice_, total, included, extras))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Projections de détail — les formes *profile* officielles
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _contrats_de(resource_id: str) -> list[dict[str, str]]:
+    """Les références de contrats d'une ressource — via `dependsOn`, comme l'API."""
+    refs = []
+    for contrat in state.dataset.get("contracts", []):
+        data = (contrat.get("relationships") or {}).get("dependsOn", {}).get("data")
+        if data and data.get("type") == "resource" and data.get("id") == resource_id:
+            refs.append({"id": contrat["id"], "type": "contract"})
+    return refs
+
+
+def _anciennete(refs_contrats: list[dict[str, str]]) -> str:
+    ids = {ref["id"] for ref in refs_contrats}
+    debuts = [c["attributes"]["startDate"] for c in state.dataset["contracts"] if c["id"] in ids]
+    return min(debuts) if debuts else ""
+
+
+def _date_naissance(rid: int) -> str:
+    """État civil synthétique DÉTERMINISTE — le jeu de base ne le porte pas."""
+    return f"{1978 + (rid * 7) % 18}-{1 + (rid % 12):02d}-{1 + (rid * 3) % 28:02d}"
+
+
+def _profil_ressource(item: dict[str, Any]) -> dict[str, Any]:
+    """`GET /resources/{id}` — la forme PROFILE réelle (18 attributs relevés),
+    distincte de la recherche, avec la relation `contracts`."""
+    rid = int(item["id"])
+    attrs = item["attributes"]
+    rels = item.get("relationships") or {}
+    contrats = _contrats_de(item["id"])
+    anciennete = _anciennete(contrats)
+    niveau = "administrator" if rid == 1 else ("manager" if rid <= 6 else "resource")
+    return {
+        "id": item["id"],
+        "type": "resource",
+        "attributes": {
+            "creationDate": attrs.get("creationDate"),
+            "updateDate": attrs.get("updateDate"),
+            "civility": attrs.get("civility"),
+            "thumbnail": attrs.get("thumbnail", ""),
+            "firstName": attrs["firstName"],
+            "lastName": attrs["lastName"],
+            "typeOf": attrs.get("typeOf"),
+            "level": niveau,
+            "title": attrs.get("title"),
+            "dateOfBirth": _date_naissance(rid),
+            "numberOfResumes": attrs.get("numberOfResumes"),
+            "seniorityDate": anciennete,
+            "forceSeniorityDate": False,
+            "originalSeniorityDate": anciennete,
+            "validitySeniorityDate": "",
+            "tdLink": f"/api/resources/{item['id']}/technical-data",
+            "tdId": item["id"],
+            "creationSource": None,
+        },
+        "relationships": {
+            "mainManager": rels.get("mainManager", {"data": None}),
+            "hrManager": rels.get("hrManager", {"data": None}),
+            "agency": rels.get("agency", {"data": None}),
+            "pole": rels.get("pole", {"data": None}),
+            "contracts": {"data": contrats},
+        },
+    }
+
+
+def _profil_projet(item: dict[str, Any]) -> dict[str, Any]:
+    """`GET /projects/{id}` — la forme PROFILE réelle (13 attributs relevés)."""
+    attrs = item["attributes"]
+    rels = item.get("relationships") or {}
+    return {
+        "id": item["id"],
+        "type": "project",
+        "attributes": {
+            "creationDate": attrs.get("creationDate"),
+            "currency": attrs.get("currency"),
+            "currencyAgency": attrs.get("currencyAgency"),
+            "deliverySuggestFilters": [],
+            "exchangeRate": attrs.get("exchangeRate"),
+            "exchangeRateAgency": attrs.get("exchangeRateAgency"),
+            "isProjectManager": True,
+            "mode": attrs.get("mode"),
+            "reference": attrs.get("reference"),
+            "startDate": attrs.get("startDate"),
+            "typeOf": attrs.get("typeOf"),
+            "updateDate": attrs.get("updateDate"),
+            "workUnitRate": 1,
+        },
+        "relationships": {
+            "agency": rels.get("agency", {"data": None}),
+            "company": rels.get("company", {"data": None}),
+            "mainManager": rels.get("mainManager", {"data": None}),
+            "opportunity": rels.get("opportunity", {"data": None}),
+            "pole": rels.get("pole", {"data": None}),
+        },
+    }
+
+
+#: Les modules dont le détail projette une forme profile dédiée ; les autres
+#: servent l'item de recherche tel quel (simplification documentée).
+PROJECTIONS_PROFIL: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "resources": _profil_ressource,
+    "projects": _profil_projet,
+}
+
+#: Table `included` dédiée aux détails qui en ont une (listes blanches réelles).
+MODULE_INCLUDED_DETAIL: dict[str, str] = {
+    "resources": "resources/profil",
+    "projects": "projects/profil",
+    "contracts": "contracts/profil",
+    "deliveries": "deliveries/profil",
+}
 
 
 def _detail(request: Request, spec: CollectionSpec, item_id: str) -> JSONResponse:
@@ -177,13 +463,21 @@ def _detail(request: Request, spec: CollectionSpec, item_id: str) -> JSONRespons
         return injected
     if (denied := _check_auth(request)) is not None:
         return denied
+    if path_name in settings.forbidden_collections:
+        return error(403, request=request)
     for item in _collection_items(dataset_key):
         if item["id"] == item_id:
-            return JSONResponse({"data": item})
-    # Le singulier vient de la spec, plus d'un `[:-1]` sur le chemin : ce
-    # découpage donnait « timesReport » → « times-report » sur la collection à
-    # tiret. Les messages des collections historiques sont inchangés.
-    return error(404, f"{spec.singulier} {item_id} not found")
+            projection = PROJECTIONS_PROFIL.get(path_name)
+            enrichi = projection(item) if projection else item
+            module = MODULE_INCLUDED_DETAIL.get(path_name, dataset_key)
+            included = (
+                construire_included([enrichi], state.dataset, module, state.index_entites())
+                if spec.avec_included
+                else None
+            )
+            return JSONResponse(envelope_detail(enrichi, included))
+    # Message générique réel : "HTTP 404 (GET /api/resources/999999999)".
+    return error(404, request=request)
 
 
 def _register(spec: CollectionSpec) -> None:
@@ -191,31 +485,42 @@ def _register(spec: CollectionSpec) -> None:
 
     La fonction existe pour lier `spec` À CHAQUE ITÉRATION : sans elle, la
     fermeture capturerait la variable de boucle et toutes les routes serviraient
-    la dernière collection. C'est le même garde-fou que dans le mock d'origine.
+    la dernière collection.
 
     `response_model` est déclaré mais les handlers rendent une `JSONResponse` :
     FastAPI documente alors la forme SANS revalider la sortie. C'est délibéré —
     un mock doit pouvoir servir des charges volontairement anormales (dérive de
     pagination, champs manquants) sans que sa propre validation l'en empêche.
-    Le contrat décrit le cas nominal ; les pannes restent injectables.
     """
 
-    @api.get(
-        f"/{spec.chemin}",
-        name=f"list_{spec.cle_dataset}",
-        response_model=ListEnvelope[spec.modele],  # type: ignore[valid-type]
-        responses=REPONSES_ERREUR,
-        summary=f"Liste paginée : {spec.chemin}",
-    )
-    def _list(request: Request) -> JSONResponse:
-        return _paginated(request, spec)
+    if spec.liste_405:
+        # La recherche n'existe pas en réel (POST seul au RAML) : 405 enveloppé,
+        # hors contrat OpenAPI — la route n'est là que pour mimer le réel.
+        @api.get(f"/{spec.chemin}", name=f"list_{spec.cle_dataset}", include_in_schema=False)
+        def _liste_interdite(request: Request) -> JSONResponse:
+            return error(405, request=request, connecte=False)
+
+    else:
+
+        @api.get(
+            f"/{spec.chemin}",
+            name=f"list_{spec.cle_dataset}",
+            response_model=ListEnvelope[spec.modele],  # type: ignore[name-defined]
+            responses=REPONSES_ERREUR,
+            summary=f"Paginated search: {spec.chemin}",
+        )
+        def _list(request: Request) -> JSONResponse:
+            return _paginated(request, spec)
+
+    if not spec.avec_detail:
+        return
 
     @api.get(
         f"/{spec.chemin}/{{item_id}}",
         name=f"get_{spec.cle_dataset}",
-        response_model=ItemEnvelope[spec.modele],  # type: ignore[valid-type]
+        response_model=ItemEnvelope[spec.modele],  # type: ignore[name-defined]
         responses=REPONSES_ERREUR,
-        summary=f"Détail : {spec.singulier}",
+        summary=f"Profile: {spec.singulier}",
     )
     def _get(request: Request, item_id: str) -> JSONResponse:
         return _detail(request, spec, item_id)
@@ -226,13 +531,85 @@ for _spec in COLLECTIONS:
 
 
 @api.get(
+    "/resources/{item_id}/administrative",
+    response_model=ItemEnvelope[AdministratifRessource],
+    responses=REPONSES_ERREUR,
+    summary="Administrative tab — THE official path to contracts",
+)
+def administrative(request: Request, item_id: str) -> JSONResponse:
+    """`GET /resources/{id}/administrative` — official schema, VALIDATED live.
+
+    The documented way to fetch a resource's contracts: the `contracts`
+    relationship lists the identifiers, `included` carries their reduced
+    shape, and `GET /contracts/{id}` returns the full detail (salaries, costs,
+    working time).
+    """
+    if (
+        injected := _dispatch_injections(
+            "/api/resources/administrative", dict(request.query_params)
+        )
+    ) is not None:
+        return injected
+    if (denied := _check_auth(request)) is not None:
+        return denied
+    ressource = next((r for r in _collection_items("resources") if r["id"] == item_id), None)
+    if ressource is None:
+        return error(404, request=request)
+
+    rid = int(item_id)
+    attrs = ressource["attributes"]
+    contrats = _contrats_de(item_id)
+    anciennete = _anciennete(contrats)
+    sous_traitant = attrs.get("typeOf") == 1
+
+    relations: dict[str, Any] = {
+        "agency": (ressource.get("relationships") or {}).get("agency", {"data": None}),
+        "candidate": {"data": None},
+        "contracts": {"data": contrats},
+        "files": {"data": []},
+    }
+    if sous_traitant:
+        # Le réel n'émet les clés provider* que lorsqu'elles ont un sens.
+        relations["providerCompany"] = {"data": {"id": "11", "type": "company"}}
+        relations["providerContact"] = {"data": None}
+
+    item = {
+        "id": item_id,
+        "type": "resource",
+        "attributes": {
+            "reference": attrs.get("reference", ""),
+            "dateOfBirth": _date_naissance(rid),
+            "placeOfBirth": "",
+            "nationality": "Française",
+            "healthCareNumber": "",
+            "address": "",
+            "postcode": "",
+            "town": "",
+            "country": "France",
+            "subDivision": "",
+            "situation": 1,
+            "administrativeComments": "",
+            "function": attrs.get("title", ""),
+            "seniorityDate": anciennete,
+            "originalSeniorityDate": anciennete,
+            "forceSeniorityDate": False,
+            "validitySeniorityDate": "",
+        },
+        "relationships": relations,
+    }
+    included = construire_included([item], state.dataset, "administrative", state.index_entites())
+    return JSONResponse(envelope_detail(item, included))
+
+
+@api.get(
     "/resources/{item_id}/technical-data",
     response_model=ItemEnvelope[DonneesTechniques],
     responses=REPONSES_ERREUR,
-    summary="Onglet CV — seul endroit où vivent les références",
+    summary="Résumé tab — the real profile shape (type `resource`)",
 )
 def technical_data(request: Request, item_id: str) -> JSONResponse:
-    """L'onglet CV — seul endroit où vivent les `references[]`."""
+    """The résumé tab — observed live: type `resource`, fifteen attributes, no
+    relationships nor included. Detailed references live here."""
     if (
         injected := _dispatch_injections(
             "/api/resources/technical-data", dict(request.query_params)
@@ -243,42 +620,74 @@ def technical_data(request: Request, item_id: str) -> JSONResponse:
         return denied
     if "technical-data" in state.fail_collections:
         return error(500, "mock: simulated outage on /resources/{id}/technical-data")
-    data = state.dataset["technical_data"].get(item_id)
-    if data is None:
-        return error(404, f"resource {item_id} not found")
-    return JSONResponse({"data": data})
+    ressource = next((r for r in _collection_items("resources") if r["id"] == item_id), None)
+    dossier = state.dataset["technical_data"].get(item_id)
+    if ressource is None or dossier is None:
+        return error(404, request=request)
+    attrs = ressource["attributes"]
+    item = {
+        "id": item_id,
+        "type": "resource",
+        "attributes": {
+            "activityAreas": attrs.get("activityAreas", []),
+            "description": dossier["attributes"].get("description", ""),
+            "diplomas": attrs.get("diplomas", []),
+            "experience": attrs.get("experience"),
+            "expertiseAreas": attrs.get("expertiseAreas", []),
+            "languages": attrs.get("languages", []),
+            "references": dossier["attributes"].get("references", []),
+            "resourceCanModifyTechnicalData": True,
+            "skills": attrs.get("skills", ""),
+            "summary": dossier["attributes"].get("summary", ""),
+            "tdId": item_id,
+            "tdLink": f"/api/resources/{item_id}/technical-data",
+            "title": attrs.get("title", ""),
+            "tools": attrs.get("tools", []),
+            "training": [],
+        },
+    }
+    return JSONResponse(envelope_detail(item))
 
 
 @api.get(
     "/application/current-user",
-    response_model=ItemEnvelope[Compte],
+    response_model=ItemEnvelope[UtilisateurCourant],
     responses=REPONSES_ERREUR,
-    summary="Vérification d'identité — test de fumée des identifiants",
+    summary="Identity check — credentials smoke test",
 )
 def current_user(request: Request) -> JSONResponse:
-    """Vérification d'identité — utilisé comme test de fumée des identifiants."""
+    """`GET /application/current-user` — real type `currentuser` (observed),
+    with the attribute subset consumers rely on."""
     if (denied := _check_auth(request)) is not None:
         return denied
     return JSONResponse(
-        {
-            "data": {
+        envelope_detail(
+            {
                 "id": "1",
-                "type": "account",
+                "type": "currentuser",
                 "attributes": {
-                    "firstName": "Mock",
-                    "lastName": "Sync",
-                    "email": settings.basic_user,
+                    "firstName": "Demo",
+                    "lastName": "Boréal",
+                    "login": settings.basic_user,
+                    "email1": settings.basic_user,
+                    "level": "manager",
+                    "isOwner": True,
+                    "narrowPerimeter": False,
+                    "language": "fr",
+                },
+                "relationships": {
+                    "agency": {"data": {"id": "1", "type": "agency"}},
+                    "role": {"data": {"id": "1", "type": "role"}},
                 },
             }
-        }
+        )
     )
 
 
 app.include_router(api)
 
 # Le plan de contrôle n'est pas « monté puis interdit » : quand il est
-# désactivé, la surface n'existe pas. C'est la configuration du déploiement
-# d'ophelie sur le cluster.
+# désactivé, la surface n'existe pas.
 if settings.admin_enabled:
     from .admin import router as admin_router
 
@@ -289,20 +698,10 @@ if settings.admin_enabled:
 #  Rémunération — DÉLIBÉRÉMENT HORS DE /api
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# Aucun endpoint de rémunération par ressource n'est attesté chez BoondManager.
-# L'ADR-0002 d'ophelie, écrit depuis une intégration production vérifiée,
-# énumère resources / companies / contacts / projects / agencies et le
-# sous-onglet technical-data — rien d'autre. Le seul champ monétaire par
-# ressource est `averageDailyPriceExcludingTax`, qui est un tarif de vente.
-#
-# La spec d'insights360 en a pourtant besoin (`fct_remuneration` est la table la
-# plus sensible du modèle et toute sa suite de tests négatifs en dépend), et
-# elle interdit explicitement d'inventer un champ fournisseur.
-#
-# Résolution : la rémunération est servie comme un FICHIER, hors de `/api`, pour
-# que personne ne puisse la prendre pour un endpoint BoondManager. C'est
-# probablement aussi la vérité métier — une rémunération vit dans une paie ou un
-# SIRH, pas dans l'ERP commercial. Cf. docs/adr/0004.
+# Servie comme un FICHIER, hors de `/api`, pour que personne ne la prenne pour
+# un endpoint fournisseur. Depuis l'alignement sur les schémas officiels, les
+# montants sont DÉRIVÉS de `/api/contracts/{id}` (champ `monthlySalary`,
+# attesté) — le CSV n'est plus qu'une vue de commodité.
 
 
 # `response_model=None` : le type de retour est une union de deux Response, que
@@ -331,8 +730,7 @@ def contrat_openapi() -> dict[str, Any]:
     """Le contrat OpenAPI — le DIALECTE BoondManager, et lui seul.
 
     Les chemins `/__admin` (plan de contrôle des pannes) et `/__fixtures`
-    (rémunération, servie hors de /api faute d'endpoint fournisseur attesté)
-    sont RETIRÉS. Deux raisons :
+    (rémunération, servie hors de /api) sont RETIRÉS. Deux raisons :
 
       • ce sont des affordances du mock, pas du fournisseur. Les publier au
         contrat ferait passer pour du BoondManager ce qui n'en est pas — et un
@@ -342,8 +740,7 @@ def contrat_openapi() -> dict[str, Any]:
         contrat dépendrait alors de l'environnement de génération, et le test
         anti-dérive échouerait selon la façon dont on l'a lancé.
 
-    Elles restent documentées — dans le README et dans docs/adr/0002 — mais hors
-    du contrat.
+    Elles restent documentées — dans le README — mais hors du contrat.
     """
     spec = app.openapi()
     spec["paths"] = {

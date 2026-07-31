@@ -1,79 +1,79 @@
 ---
 type: features
-description: L'ordre de pagination — instable par défaut, gelé pour le profil ophelie, et le bug de client que cela a révélé.
+description: Pagination ordering — stable by default like the real API, with opt-in instability, and the client bug it once revealed.
 sources_of_truth:
   - src/boondmanager_mock/envelope.py
 review_triggers:
   - src/boondmanager_mock/envelope.py
   - src/boondmanager_mock/dataset/**
 update_policy: auto
-last_verified: 2026-07-29
+last_verified: 2026-07-31
 ---
 
-# L'ordre de pagination
+# Pagination ordering
 
-## Ce que fait le mock
+## What the mock does
 
-| Situation | Ordre |
+| Situation | Order |
 |---|---|
-| `sort=<champ>` fourni | **stable**, trié sur ce champ (`order=asc\|desc`) |
-| profil `ophelie` | **stable** — profil gelé, comportement historique |
-| profil `insights360`, sans `sort` | **INSTABLE**, et délibérément |
-| `BOOND_MOCK_STABLE_ORDER=true` | stable, pour du `curl` exploratoire |
+| `sort=<field>` provided | **stable**, sorted on that field (`order=asc\|desc`, dotted paths accepted: `workUnitType.reference`) |
+| no `sort` (default) | **STABLE** — aligned with the observed real API (2026-07-31: two identical calls, same sequence) |
+| `BOOND_MOCK_STABLE_ORDER=false` | unstable — pagination chaos, as an opt-in |
+| injection `{"kind": "unstable_order"}` | unstable, for the duration of a test |
 
-L'instabilité est déterministe dans un test donné — `hash((rang de requête, id))`
-— donc reproductible, tout en variant réellement d'une requête à l'autre.
+Instability is deterministic within a given test — `hash((request rank, id))`
+— hence reproducible, while genuinely varying from one request to the next.
 
-## Pourquoi l'instabilité est le comportement par défaut
+## Why instability remains available (opt-in)
 
-Une API qui ne garantit pas l'ordre de ses résultats fait **sauter des
-enregistrements et en dupliquer d'autres** dès qu'on la pagine sans tri
-explicite. Le mécanisme est simple : si l'ordre change entre la requête de la
-page 1 et celle de la page 2, un élément qui était en fin de page 1 peut se
-retrouver en début de page 2 (rendu deux fois), et son voisin disparaître.
+An API that does not guarantee result ordering **skips records and duplicates
+others** as soon as you paginate without an explicit sort. The mechanism is
+simple: if the order changes between the page-1 and page-2 requests, an
+element that was at the end of page 1 can reappear at the start of page 2
+(served twice), while its neighbour disappears.
 
-Rien ne le signale. Aucune erreur, aucun avertissement — juste des données
-incomplètes qui ressemblent à des données complètes.
+Nothing signals it. No error, no warning — just incomplete data that looks
+complete.
 
-Un mock qui trierait toujours ses résultats laisserait donc passer ce défaut, et
-le bug attendrait la production pour se manifester. C'est exactement ce que la
-spécification d'insights360 demande de reproduire : *« unstable ordering unless
-an explicit sort is requested »*.
+The mock's default is now STABLE — because that is what the real API showed,
+and fidelity comes first now that the mock doubles as a comparison bench. But
+a robust pipeline must survive instability: enabling chaos mode before
+signing off an extractor remains best practice.
 
-## Ce que cela a révélé, immédiatement
+## What it revealed, immediately
 
-À la migration d'ophelie vers ce paquet, son test
-`test_iter_collection_walks_every_page` a échoué :
+When the mock was first extracted from its original repository, the production
+client's pagination test failed:
 
 ```
 assert len({item["id"] for item in items}) == 24
 E   AssertionError: assert 18 == 24
 ```
 
-**Dix-huit ressources sur vingt-quatre.** Le client de production d'ophelie
-(`app/boond/client.py::iter_collection`) pagine avec `page` et `maxResults`
-**sans jamais envoyer de tri**. Contre un mock instable, il en perd six sur
-vingt-quatre.
+**Eighteen resources out of twenty-four.** That client paginated with `page`
+and `maxResults` **without ever sending a sort**. Against an unstable mock it
+lost six records out of twenty-four. That is not a mock artefact: it is how
+that client would behave against any API that does not guarantee its ordering.
 
-Ce n'est pas un artefact du mock : c'est le comportement qu'aurait ce client
-contre n'importe quelle API qui ne garantit pas son ordre. BoondManager le
-garantit-il ? Rien ne l'atteste — et c'est bien le problème.
+## What a correct consumer does
 
-**Le mock n'a pas été « corrigé » pour faire passer le test.** Le profil
-`ophelie` a été gelé dans son comportement historique, parce qu'un profil dit
-gelé dont la sémantique de pagination change n'est pas gelé — il casse
-simplement plus tard. Le constat, lui, est remonté tel quel : c'est une décision
-qui appartient à ophelie, pas à son mock.
-
-## Ce que fait un consommateur correct
-
-`insights360:extract/…/boondmanager/client.py` envoie **toujours** un tri :
+Always send a sort:
 
 ```python
-params = {"page": page, "maxResults": self.page_size, "sort": "id", "order": "asc"}
+params = {"page": page, "maxResults": page_size, "sort": "id", "order": "asc"}
 ```
 
-Tri sur l'identifiant : stable, présent partout, indépendant du contenu métier.
-Et son test d'extraction le vérifie **côté serveur**, via
-`GET /__admin/state` → `last_query_params_by_path` — parce qu'un client qui
-aurait oublié son tri passerait sinon tous les autres tests.
+Sorting on the identifier: stable, present everywhere, independent of business
+content. And verify it **server-side**, via `GET /__admin/state` →
+`last_query_params_by_path` — because a client that forgot its sort would
+otherwise pass every other test.
+
+## Official sort keys
+
+The BoondManager documentation publishes a `sortList` per module. The ones
+that matter for incremental extraction: **`updateDate` is an official sort key
+on resources, candidates, companies, contacts and opportunities**
+(`creationDate` on several others). Combined with the official
+`period=updated&startDate&endDate` filter, that is the vendor's incremental
+toolkit — both are implemented here. The mock sorts on any attribute: an
+acknowledged superset, documented in `docs/UNVERIFIED-FIELDS.md`.

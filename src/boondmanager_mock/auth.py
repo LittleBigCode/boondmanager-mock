@@ -68,7 +68,7 @@ def jwt_is_valid(token: str) -> bool:
         if not hmac.compare_digest(expected, _b64url_decode(signature_b64)):
             return False
         payload = json.loads(_b64url_decode(payload_b64))
-        return (
+        return bool(
             payload.get("userToken") == settings.user_token
             and payload.get("clientToken") == settings.client_token
         )
