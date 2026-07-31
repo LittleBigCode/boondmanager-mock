@@ -1,5 +1,7 @@
 # boondmanager-mock
 
+[![CI](https://github.com/LittleBigCode/boondmanager-mock/actions/workflows/ci.yml/badge.svg)](https://github.com/LittleBigCode/boondmanager-mock/actions/workflows/ci.yml)
+
 Mock of the **BoondManager** API, shipped both as a **container image** and as
 an **installable Python package**. Aligned with the official documentation
 (the RAML spec at [doc.boondmanager.com/api-externe](https://doc.boondmanager.com/api-externe/))
@@ -11,7 +13,11 @@ and profiles included ([`docs/comparisons/`](docs/comparisons/)).
 ## Start in one command
 
 ```bash
-# Container, ready to use (admin plane open, evolution active):
+# Pre-built image from GitHub Container Registry (published by CI):
+docker run -p 8000:8000 -e BOOND_MOCK_ADMIN_ENABLED=true \
+    ghcr.io/littlebigcode/boondmanager-mock:latest
+
+# Or build locally (admin plane open, evolution active):
 docker compose up --build           # or: make up
 curl http://localhost:8000/health
 
@@ -25,12 +31,11 @@ curl -H "X-Jwt-Client-Boondmanager: <jwt>" http://localhost:8000/api/resources
 ```
 
 The image (152 MB, non-root, built-in healthcheck — `depends_on:
-condition: service_healthy` works on the consumer side) is built with
-`make image` and can be published as-is:
-
-```bash
-docker run -p 8000:8000 -e BOOND_MOCK_ADMIN_ENABLED=true boondmanager-mock:0.3.0
-```
+condition: service_healthy` works on the consumer side) is built and
+**published to `ghcr.io/littlebigcode/boondmanager-mock` by CI**
+(`.github/workflows/ci.yml`): `:latest` on every push to `main`, `:X.Y.Z` on
+`vX.Y.Z` tags, `:sha-…` for traceability — after a smoke test (the container
+must boot and answer the dialect). Locally: `make image`.
 
 ## Two modes, both maintained
 
