@@ -23,11 +23,6 @@ curl http://localhost:8000/health
 
 # Or locally without Docker:
 make bootstrap && make run
-
-# The JWT to query /api:
-python -c "from boondmanager_mock import build_client_jwt; \
-           print(build_client_jwt('mock-user-token','mock-client-token','mock-client-key'))"
-curl -H "X-Jwt-Client-Boondmanager: <jwt>" http://localhost:8000/api/resources
 ```
 
 The image (152 MB, non-root, built-in healthcheck — `depends_on:
@@ -36,6 +31,53 @@ condition: service_healthy` works on the consumer side) is built and
 (`.github/workflows/ci.yml`): `:latest` on every push to `main`, `:X.Y.Z` on
 `vX.Y.Z` tags, `:sha-…` for traceability — after a smoke test (the container
 must boot and answer the dialect). Locally: `make image`.
+
+## Default credentials
+
+Everything is overridable through environment variables (see
+[Configuration](#configuration)); out of the box the mock accepts:
+
+| Role | Variable | Default value |
+|---|---|---|
+| `userToken` (JWT claim) | `BOOND_MOCK_USER_TOKEN` | `mock-user-token` |
+| `clientToken` (JWT claim) | `BOOND_MOCK_CLIENT_TOKEN` | `mock-client-token` |
+| `clientKey` (HS256 signing key) | `BOOND_MOCK_CLIENT_KEY` | `mock-client-key` |
+| Basic auth — user | `BOOND_MOCK_BASIC_USER` | `demo@boreal-conseil.example` |
+| Basic auth — password | `BOOND_MOCK_BASIC_PASSWORD` | `mock-password` |
+| `/__admin` control plane | `BOOND_MOCK_ADMIN_TOKEN` | `mock-admin-token` (header `X-Mock-Admin-Token`; only mounted when `BOOND_MOCK_ADMIN_ENABLED=true`) |
+
+**Client JWT** (same dialect as the real API — HS256, base64url without
+padding, payload exactly `{"userToken","clientToken"}`). With the default
+tokens the JWT is deterministic — ready to copy:
+
+```bash
+curl -H "X-Jwt-Client-Boondmanager: eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyVG9rZW4iOiAibW9jay11c2VyLXRva2VuIiwgImNsaWVudFRva2VuIjogIm1vY2stY2xpZW50LXRva2VuIn0.-_gSmxda-Sy9SkTvswwmieG_nD3I1_fOoGdFxw5Nzdk" \
+  http://localhost:8000/api/resources
+```
+
+To generate it yourself (needed as soon as you change the tokens):
+
+```bash
+python -c "from boondmanager_mock import build_client_jwt; \
+           print(build_client_jwt('mock-user-token','mock-client-token','mock-client-key'))"
+```
+
+**Basic auth**, handy for manual exploration:
+
+```bash
+curl -u 'demo@boreal-conseil.example:mock-password' http://localhost:8000/api/resources
+```
+
+**Control plane** (failure injection, virtual clock, mutations):
+
+```bash
+curl -H 'X-Mock-Admin-Token: mock-admin-token' http://localhost:8000/__admin/state
+```
+
+Heads-up, as on the real API: a **missing** JWT yields `401`; a JWT that is
+**present but badly signed** yields `422` with
+`"422 - Signature verification failed"` — a 422 almost always means the
+`clientKey` does not match the tokens.
 
 ## Two modes, both maintained
 
