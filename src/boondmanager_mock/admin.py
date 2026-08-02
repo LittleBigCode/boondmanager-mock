@@ -177,7 +177,7 @@ async def mutate(
             # L'avancée de l'horodatage n'est pas cosmétique : sans elle, le
             # curseur incrémental ne reverrait jamais l'enregistrement modifié,
             # et le test d'incrémentalité passerait en ne testant rien.
-            item["attributes"][_UPDATED_AT] = _bump(item["attributes"].get(_UPDATED_AT))
+            item["attributes"][_UPDATED_AT] = _horodate_apres_tous(items, item)
             state.invalider_caches()
             return JSONResponse({"status": "mutated", "id": item_id})
     return error(404, f"{collection}/{item_id} not found")
@@ -206,7 +206,7 @@ async def soft_delete(
     for item in items:
         if item["id"] == item_id:
             item.setdefault("attributes", {})["isDeleted"] = True
-            item["attributes"][_UPDATED_AT] = _bump(item["attributes"].get(_UPDATED_AT))
+            item["attributes"][_UPDATED_AT] = _horodate_apres_tous(items, item)
             state.invalider_caches()
             return JSONResponse({"status": "soft-deleted", "id": item_id})
     return error(404, f"{collection}/{item_id} not found")
@@ -232,6 +232,26 @@ async def clock(
 
 
 _UPDATED_AT = "updateDate"
+
+
+def _horodate_apres_tous(items: list[dict[str, Any]], item: dict[str, Any]) -> str:
+    """Le nouvel horodatage dépasse le MAXIMUM de la collection.
+
+    Pas seulement celui de l'enregistrement modifié, et c'est la différence qui
+    compte : un curseur incrémental avance sur le maximum VU. Un `updateDate`
+    bumpé depuis la valeur propre à l'item retombe presque toujours SOUS ce
+    maximum, la modification devient invisible au run suivant, et le test
+    d'incrémentalité passe en ne testant rien.
+
+    C'est aussi le comportement réel : une API horodate la mutation à l'instant
+    où elle a lieu, donc au-dessus de tout ce qui précède.
+    """
+    courant = item.get("attributes", {}).get(_UPDATED_AT)
+    maximum = max(
+        (i.get("attributes", {}).get(_UPDATED_AT) or "" for i in items),
+        default=courant,
+    )
+    return _bump(maximum or courant)
 
 
 def _bump(current: str | None) -> str:
