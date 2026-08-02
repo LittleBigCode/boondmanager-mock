@@ -483,12 +483,49 @@ _IDS_SOUS_TRAITANTS = (23, 24)
 _IDS_INTEGRATION = (31, 32)
 _IDS_SORTIS = (33, 34)
 
+#: ┌─ CAS LIMITES D'AUTORISATION ───────────────────────────────────────────────┐
+#: │ Ces cohortes ne servent pas la vraisemblance : elles servent à ce qu'un    │
+#: │ modèle d'autorisation construit sur ce jeu de données PUISSE ÉCHOUER.      │
+#: │ Un jeu uniforme rend un test de visibilité vrai par vacuité — il passe     │
+#: │ aussi bien avec un modèle correct qu'avec un modèle cassé.                 │
+#: └────────────────────────────────────────────────────────────────────────────┘
+
+#: Deux personnes de MÊME prénom et MÊME nom, dans deux agences différentes.
+#: C'est le cas limite le plus dangereux du lot : un consommateur qui dérive un
+#: identifiant d'annuaire (UPN, e-mail) du seul « prénom.nom » leur attribue la
+#: même identité, et FUSIONNE leurs périmètres de visibilité. Ce n'est pas un
+#: défaut cosmétique, c'est une escalade de privilège silencieuse. Leurs
+#: adresses sont donc délibérément distinctes — la résolution de collision par
+#: ordinal est ce que le consommateur doit reproduire.
+_IDS_HOMONYMES = (27, 28)
+
+#: Une personne dont l'agence de rattachement a changé en cours d'année. Ses
+#: faits (temps, missions) restent portés par l'agence où ils ont été produits,
+#: pas par son agence actuelle. Un modèle qui rattache les faits au
+#: collaborateur plutôt qu'à la ligne de fait réécrit rétroactivement
+#: l'historique — invisible tant qu'aucun collaborateur ne bouge.
+_ID_MUTATION = 22
+_AGENCE_AVANT_MUTATION = 2
+#: Mois de la mutation : les CRA ANTÉRIEURS portent l'ancienne agence.
+#: Choisi DANS la fenêtre MOIS_ACTIVITE (mai-juillet 2026), sans quoi le cas
+#: n'existe pas : aucun CRA ne tomberait du bon côté de la bascule.
+_MOIS_MUTATION = 6
+
+#: Mois de sortie des ressources sorties. Elles conservent leur historique
+#: JUSQU'À ce mois, et rien après. Également choisi dans MOIS_ACTIVITE, pour
+#: que « a produit puis est parti » soit observable et non seulement déclaré.
+_MOIS_SORTIE = 5
+
 
 def _ressources(rng: random.Random) -> list[dict[str, Any]]:
     ressources: list[dict[str, Any]] = []
     for i in range(1, _NB_RESSOURCES + 1):
-        prenom = _PRENOMS[(i * 7) % len(_PRENOMS)]
-        nom = _NOMS[(i * 11) % len(_NOMS)]
+        if i in _IDS_HOMONYMES:
+            # Même prénom ET même nom pour les deux : cf. _IDS_HOMONYMES.
+            prenom, nom = "Camille", "Fontaine"
+        else:
+            prenom = _PRENOMS[(i * 7) % len(_PRENOMS)]
+            nom = _NOMS[(i * 11) % len(_NOMS)]
         est_direction = i == 1
         est_manager = i in _IDS_MANAGERS
         sorti = i in _IDS_SORTIS
@@ -496,6 +533,11 @@ def _ressources(rng: random.Random) -> list[dict[str, Any]]:
         sous_traitant = i in _IDS_SOUS_TRAITANTS
 
         agence = 1 if i in (1, 2, 3) else (2 if i % 3 == 0 else (3 if i % 7 == 0 else 1))
+        if i in _IDS_HOMONYMES:
+            # Deux agences distinctes : c'est ce qui rend le cas discriminant.
+            # Homonymes dans la même agence, une fusion d'identité ne changerait
+            # aucun périmètre et le test resterait vert à tort.
+            agence = 1 if i == _IDS_HOMONYMES[0] else 3
         pole = ((i - 1) % len(_POLES)) + 1
         bu = ((i - 1) % len(_BUSINESS_UNITS)) + 1
         if est_direction:
@@ -524,6 +566,11 @@ def _ressources(rng: random.Random) -> list[dict[str, Any]]:
             else (ETAT_RESSOURCE_INTEGRATION if integration else ETAT_RESSOURCE_ACTIVE)
         )
         courriel = f"{prenom.lower()}.{nom.lower()}@boreal-conseil.example"
+        if i == _IDS_HOMONYMES[1]:
+            # Résolution de collision par ordinal. Le SECOND porte le suffixe :
+            # c'est la convention des annuaires, et elle rend le cas asymétrique
+            # — un consommateur qui suffixerait les deux passerait quand même.
+            courriel = f"{prenom.lower()}.{nom.lower()}2@boreal-conseil.example"
         competences = rng.sample(_COMPETENCES, k=rng.randint(4, 6))
         en_intercontrat = i in (25, 26, 29, 30)
 
@@ -1705,10 +1752,20 @@ def _cras(
     ident = 1
     for res in ressources:
         rid = int(res["id"])
-        if rid <= 6 or res["attributes"]["state"] == ETAT_RESSOURCE_SORTIE:
+        if rid <= 6:
             continue
+        sorti = res["attributes"]["state"] == ETAT_RESSOURCE_SORTIE
         for annee, mois in MOIS_ACTIVITE:
             if rid in _IDS_INTEGRATION and mois < 7:
+                continue
+            # Un SORTI conserve son historique jusqu'à son départ, et rien
+            # après. Ne lui donner AUCUN CRA effacerait le passé : un ancien
+            # collaborateur doit rester visible dans les faits historiques
+            # (rémunération, temps produits) tout en n'ayant plus aucune
+            # visibilité applicative. Ce sont deux propriétés distinctes, et
+            # les confondre est ce qui fait qu'un partant garde des droits —
+            # ou qu'on perd la trace de ce qu'il a produit.
+            if sorti and mois > _MOIS_SORTIE:
                 continue
             if mois == 7:
                 etat = rng.choice(["waitingForValidation", "savedAndNoValidation"])
@@ -1727,7 +1784,14 @@ def _cras(
                         "isDeleted": False,
                     },
                     "relationships": {
-                        "agency": res["relationships"]["agency"],
+                        # L'agence vient de la LIGNE DE FAIT, pas du
+                        # collaborateur : cf. _ID_MUTATION. Un mutant garde ses
+                        # CRA antérieurs sous son ancienne agence.
+                        "agency": (
+                            _rel("agency", _AGENCE_AVANT_MUTATION)
+                            if rid == _ID_MUTATION and mois < _MOIS_MUTATION
+                            else res["relationships"]["agency"]
+                        ),
                         "resource": _rel("resource", res["id"]),
                     },
                 }
