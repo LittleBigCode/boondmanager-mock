@@ -64,9 +64,7 @@ def test_deux_homonymes_avec_des_adresses_distinctes() -> None:
 
     # …et ils doivent rester les SEULS : un second couple d'homonymes non
     # intentionnel rendrait tout diagnostic ambigu chez le consommateur.
-    noms = Counter(
-        (r["attributes"]["firstName"], r["attributes"]["lastName"]) for r in ressources
-    )
+    noms = Counter((r["attributes"]["firstName"], r["attributes"]["lastName"]) for r in ressources)
     assert [n for n, c in noms.items() if c > 1] == [
         (a["attributes"]["firstName"], a["attributes"]["lastName"])
     ]
