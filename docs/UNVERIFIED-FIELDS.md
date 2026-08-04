@@ -56,6 +56,26 @@ Since v0.3.0 the reference is TWOFOLD, and observation wins:
   `resources/{id}/technical-data` (type `resource`) — all at zero difference;
 - default ordering is STABLE; `sort=updateDate` and `period=updated|created`.
 
+## Behaviour DOCUMENTED but not implemented by the provider
+
+Distinct from the field matrix below: here the API *accepts* something and does
+not act on it. Silent, and therefore expensive — a rejected parameter at least
+tells the caller something.
+
+| Endpoint | Documented | Observed | Measured |
+|---|---|---|---|
+| `/times` | `period=updated\|created` + `startDate`/`endDate` filters the collection | **accepted and ignored** — all three filter shapes return the full set (106 976 rows on a production tenant) | 2026-08-04, [comparisons/2026-08-04.md](comparisons/2026-08-04.md) |
+
+The mock reproduces this via `CollectionSpec(..., filtre_periode=False)` and
+locks it with `tests/test_ecarts_api_documentation.py`. It is NOT turned into a
+`422`: the real API does not reject these parameters, and a consumer seeing an
+error would fix a problem that does not exist.
+
+Compounding gap: `times` also has no `updateDate` (see the matrix below). No
+timestamp to filter on, and no filter that works — a consumer has **no
+incremental path at all** on this collection, and must size its cadence
+accordingly.
+
 ## The RAML × observed matrix
 
 Fields DOCUMENTED in the RAML that the real API never returned (even with the

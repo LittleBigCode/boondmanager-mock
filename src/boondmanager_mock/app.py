@@ -97,6 +97,12 @@ class CollectionSpec:
     avec_included: bool = True  # les modules sans `included` au schéma officiel
     liste_405: bool = False  # GET liste absent en réel (contracts, deliveries)
     parametres_obligatoires: tuple[str, ...] = ()  # 422 code 1017 sinon
+    #: Le filtre `period=updated|created` est-il HONORÉ par cette collection ?
+    #:
+    #: `True` partout SAUF `/times` — cf. le bloc « ÉCART DOCUMENTÉ » ci-dessous.
+    #: Mettre `False` ne fait pas répondre en erreur : la collection accepte les
+    #: paramètres et les IGNORE, exactement comme le fournisseur.
+    filtre_periode: bool = True
     meta_extra: tuple[str, ...] = ()  # clés meta propres au module (relevé réel)
 
 
@@ -157,7 +163,39 @@ COLLECTIONS: tuple[CollectionSpec, ...] = (
         "resources", "resources", Ressource, "resource", meta_extra=("conditionalFields", "solr")
     ),
     CollectionSpec("roles", "roles", Role, "role", avec_included=False),
-    CollectionSpec("times", "times", Temps, "time", avec_detail=False),
+    # ┌─ ÉCART DOCUMENTÉ ENTRE L'API RÉELLE ET SA DOCUMENTATION ───────────────┐
+    # │ La documentation BoondManager présente `period=updated|created` +       │
+    # │ `startDate`/`endDate` comme un filtre GÉNÉRAL des collections.          │
+    # │ Sur `/times`, l'API RÉELLE ne l'honore pas : elle rend le jeu complet.  │
+    # │                                                                          │
+    # │ Mesuré le 2026-08-04 contre ui.boondmanager.com, sur un tenant de       │
+    # │ production comptant 106 976 lignes de temps :                            │
+    # │                                                                          │
+    # │     sans filtre                       → 106 976                          │
+    # │     startDate=2026-07-01&endDate=…    → 106 976                          │
+    # │     startMonth=2026-07&endMonth=…     → 106 976                          │
+    # │     period=updated&startDate=…        → 106 976                          │
+    # │                                                                          │
+    # │ Les trois formes sont acceptées — aucune n'est rejetée — et les trois    │
+    # │ rendent le même total. Il n'y a donc AUCUN fenêtrage côté serveur sur    │
+    # │ cette collection.                                                        │
+    # │                                                                          │
+    # │ Pourquoi le mock le reproduit plutôt que de « bien faire » :             │
+    # │   un mock qui filtre là où le fournisseur ne filtre pas rend le          │
+    # │   consommateur VERT sur un comportement qui n'existe pas. Le             │
+    # │   dimensionnement, la cadence d'extraction et la charge imposée à l'API  │
+    # │   se calculent alors sur une fiction. C'est précisément ce qui est       │
+    # │   arrivé : la cadence horaire d'insights360 supposait un incrémental,    │
+    # │   et représentait en réalité ~25 000 appels par jour.                    │
+    # │                                                                          │
+    # │ `/times` n'a par ailleurs PAS d'`updateDate` (cf. models/entities.py) :  │
+    # │ les deux faits se renforcent — pas d'horodatage à filtrer, pas de        │
+    # │ filtre. Un consommateur n'a d'autre choix qu'un rafraîchissement         │
+    # │ complet, et doit en tirer les conséquences sur sa cadence.               │
+    # │                                                                          │
+    # │ Cf. docs/comparisons/ et docs/UNVERIFIED-FIELDS.md.                      │
+    # └──────────────────────────────────────────────────────────────────────────┘
+    CollectionSpec("times", "times", Temps, "time", avec_detail=False, filtre_periode=False),
     CollectionSpec(
         "times-reports",
         "times_reports",
@@ -318,7 +356,12 @@ def _paginated(request: Request, spec: CollectionSpec) -> JSONResponse:
         debut, fin = params["startMonth"], params["endMonth"]
         items = [i for i in items if debut <= i["attributes"].get("term", "") <= fin]
     items = apply_keywords(items, params.get("keywords", ""), state.blobs(dataset_key))
-    items = apply_period(items, params)
+    # `filtre_periode=False` → les paramètres sont acceptés et IGNORÉS, comme
+    # le fournisseur le fait sur /times. Ne PAS transformer ça en 422 : l'API
+    # réelle ne rejette rien, elle rend simplement tout, et un consommateur qui
+    # verrait une erreur ici corrigerait un problème qui n'existe pas.
+    if spec.filtre_periode:
+        items = apply_period(items, params)
     items = apply_incremental(items, extract_since(params))
 
     total = len(items)
