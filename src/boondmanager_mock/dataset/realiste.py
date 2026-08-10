@@ -388,6 +388,18 @@ ETAT_RESSOURCE_INTERCONTRAT = 3  # UN/IC - UNASIGNED [8 W]  -> IN
 ETAT_RESSOURCE_CONGE_LONG = 4  # LONG TERM LEAVE          -> IN
 ETAT_RESSOURCE_PREAVIS = 5  # LEAVING COMPANY          -> IN
 
+#: Le regroupement IN de la feuille INDEX : tout sauf OFF. C'est la population
+#: qui produit des faits — temps, absences, frais. Distinct de
+#: `ETATS_STAFFABLES` (evolution.py), qui exclut en plus le conge longue duree :
+#: on ne staffe pas quelqu'un en conge, mais il a bien une absence.
+ETATS_DANS_L_EFFECTIF = (
+    ETAT_RESSOURCE_ACTIVE,
+    ETAT_RESSOURCE_INTEGRATION,
+    ETAT_RESSOURCE_INTERCONTRAT,
+    ETAT_RESSOURCE_CONGE_LONG,
+    ETAT_RESSOURCE_PREAVIS,
+)
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  Référentiels : agences, BU, pôles, rôles
@@ -554,7 +566,11 @@ def _etat_ressource(i: int, *, sorti: bool, integration: bool) -> int:
         return ETAT_RESSOURCE_INTEGRATION
     if i in (25, 26, 29, 30):
         return ETAT_RESSOURCE_INTERCONTRAT
-    if i == 11:
+    # 17 et non 11 : l'identifiant 11 est `kevin.silva`, la fixture
+    # « connu du SIRH, dans aucun groupe Entra » des tests d'autorisation
+    # d'insights360. Lui donner un etat particulier casse un cas limite qui
+    # n'a rien a voir. 12 et 17 ne portent aucune fixture, des deux cotes.
+    if i == 17:
         return ETAT_RESSOURCE_CONGE_LONG
     if i == 12:
         return ETAT_RESSOURCE_PREAVIS
@@ -1972,7 +1988,11 @@ def _absences_et_rapports(
     rapport_id = 1
     for res in ressources:
         rid = int(res["id"])
-        if rid <= 2 or res["attributes"]["state"] != ETAT_RESSOURCE_ACTIVE:
+        # Les faits suivent l'EFFECTIF, pas le seul etat STAFFED. Une personne
+        # en intercontrat prend des conges et engage des frais ; une personne
+        # en conge longue duree a, par definition, une absence. Filtrer sur
+        # `state == 1` les privait de tout fait — meme defaut que le banc.
+        if rid <= 2 or res["attributes"]["state"] not in ETATS_DANS_L_EFFECTIF:
             continue
         agence = next(a for a in agences if a["id"] == res["relationships"]["agency"]["data"]["id"])
         plages: list[tuple[date, date, tuple[int, str]]] = [
