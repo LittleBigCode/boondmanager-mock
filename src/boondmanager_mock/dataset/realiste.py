@@ -400,6 +400,18 @@ ETATS_DANS_L_EFFECTIF = (
     ETAT_RESSOURCE_PREAVIS,
 )
 
+#: Qui porte une mission a la construction du jeu. Distinct des deux autres
+#: regroupements, et il faut les trois :
+#:   ETATS_DANS_L_EFFECTIF  produit des faits (temps, absences, frais)
+#:   ETATS_STAFFABLES       peut etre staffe par l'evolution (evolution.py)
+#:   ETATS_AVEC_MISSION     porte deja une mission dans le jeu de depart
+#:
+#: Le conge longue duree est exclu — on ne staffe pas quelqu'un en conge. Le
+#: PREAVIS ne l'est pas : il travaille jusqu'a son terme, et c'est ce que
+#: `ETATS_STAFFABLES` affirmait deja. L'intercontrat garde son exclusion
+#: explicite plus bas : il est AU BANC, c'est sa definition.
+ETATS_AVEC_MISSION = (ETAT_RESSOURCE_ACTIVE, ETAT_RESSOURCE_PREAVIS)
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  Référentiels : agences, BU, pôles, rôles
@@ -1253,7 +1265,7 @@ def _missions(
         r
         for r in ressources
         if int(r["id"]) >= 7
-        and r["attributes"]["state"] == ETAT_RESSOURCE_ACTIVE
+        and r["attributes"]["state"] in ETATS_AVEC_MISSION
         and int(r["id"]) not in (25, 26, 29, 30)  # l'intercontrat reste au banc
     ]
     missions: list[dict[str, Any]] = []

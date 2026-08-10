@@ -282,7 +282,7 @@ def _collection_items(dataset_key: str) -> list[dict[str, Any]]:
 #  Application
 # ─────────────────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="BoondManager mock", version="0.5.3", docs_url="/docs")
+app = FastAPI(title="BoondManager mock", version="0.5.4", docs_url="/docs")
 api = APIRouter(prefix="/api")
 
 
