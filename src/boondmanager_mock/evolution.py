@@ -36,6 +36,12 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from .dataset.realiste import (
+    ETAT_RESSOURCE_ACTIVE,
+    ETAT_RESSOURCE_INTEGRATION,
+    ETAT_RESSOURCE_INTERCONTRAT,
+    ETAT_RESSOURCE_PREAVIS,
+)
 from .settings import settings
 
 #: L'époque des événements : l'ancre du jeu de données, 9 h heure de Paris.
@@ -83,10 +89,32 @@ def _prochain_id(items: list[dict[str, Any]]) -> str:
     return str(max((int(i["id"]) for i in items), default=0) + 1)
 
 
+#: Les etats du cote IN de la nomenclature d'instance, hors conge longue duree.
+#: ⚠️ CE N'EST PAS UNE OPTIMISATION, C'EST UNE CONSEQUENCE. Tant que le jeu ne
+#: rendait que trois etats, « actif » se confondait avec `state == 1` et le banc
+#: d'intercontrat s'y trouvait forcement. Depuis que l'intercontrat a SON etat
+#: (3, UN/IC - UNASIGNED), un filtre sur 1 seul VIDE le banc : les quatre
+#: consultants disponibles n'y sont plus, `_staffing` bascule en destaffing, et
+#: aucune mission n'est creee. C'est exactement ce qu'a montre
+#: test_staffing_puis_destaffing_visibles_sur_le_profil.
+#:
+#: 4 (LONG TERM LEAVE) est exclu a dessein : la personne compte dans l'effectif
+#: mais ne se staffe pas. 0 (OFF) est sorti. 5 (LEAVING COMPANY) reste staffable
+#: — un preavis travaille jusqu'a son terme.
+ETATS_STAFFABLES = (
+    ETAT_RESSOURCE_ACTIVE,
+    ETAT_RESSOURCE_INTEGRATION,
+    ETAT_RESSOURCE_INTERCONTRAT,
+    ETAT_RESSOURCE_PREAVIS,
+)
+
+
 def _actifs(dataset: dict[str, Any]) -> list[dict[str, Any]]:
-    """Les consultants actifs (ni direction, ni managers, ni sortis)."""
+    """Les consultants presents et staffables (ni direction, ni managers, ni sortis)."""
     return [
-        r for r in dataset["resources"] if int(r["id"]) >= 7 and r["attributes"].get("state") == 1
+        r
+        for r in dataset["resources"]
+        if int(r["id"]) >= 7 and r["attributes"].get("state") in ETATS_STAFFABLES
     ]
 
 

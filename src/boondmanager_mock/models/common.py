@@ -176,3 +176,57 @@ REPONSES_ERREUR: dict[int | str, dict[str, Any]] = {
 # Paramètres de requête partagés par toutes les collections.
 ParamPage = Annotated[int, Field(ge=1, description="Page number, 1-based.")]
 ParamMaxResults = Annotated[int, Field(ge=1, le=500, description="Page size. Default 30, cap 500.")]
+
+
+# ── Le dictionnaire des énumérations ─────────────────────────────────────────
+
+
+class EntreeDictionnaire(Permissif):
+    """Une correspondance code -> libellé, telle que l'INSTANCE la configure.
+
+    C'est la seule source connue du rattachement : partout ailleurs l'API rend
+    des entiers nus, et les libellés ne sont pas des constantes du produit.
+    """
+
+    id: int = Field(description="Le code numérique que l'API rend sur les autres routes.")
+    value: str = Field(description="Le libellé configuré, tel qu'il s'affiche dans l'outil.")
+
+
+class SettingDictionnaire(Permissif):
+    """Les nomenclatures, groupées par famille.
+
+    `state` est un DICT de sous-domaines (opportunity, candidate, resource) ;
+    les autres familles sont des listes plates. Les deux formes coexistent chez
+    l'éditeur — les uniformiser ici ferait diverger le mock du dialecte réel.
+
+    `action` et `actionOnOpportunity` sont deux nomenclatures DISTINCTES qui
+    partagent des libellés sous des codes différents. Les fondre ferait traduire
+    un type d'action de besoin par un libellé général.
+    """
+
+    state: dict[str, list[EntreeDictionnaire]] = Field(
+        json_schema_extra=invented(
+            "Sous-domaines du dictionnaire. La ROUTE n'est attestee par aucun rapport "
+            "de comparaison ; la forme est de notre fabrication."
+        )
+    )
+    action: list[EntreeDictionnaire]
+    actionOnCandidate: list[EntreeDictionnaire] = Field(
+        json_schema_extra=invented(
+            "Cle INFEREE de la convention de `action` et `actionOnOpportunity`. "
+            "Ce qui est atteste : une nomenclature d'actions sur candidat existe "
+            "dans l'instance (feuille Dashb du fichier de mappings)."
+        )
+    )
+    actionOnOpportunity: list[EntreeDictionnaire]
+    origin: list[EntreeDictionnaire]
+
+
+class DonneesDictionnaire(Permissif):
+    setting: SettingDictionnaire
+
+
+class EnveloppeDictionnaire(Permissif):
+    """`{"data": {"setting": {...}}}` — objet unique, sans pagination ni `meta`."""
+
+    data: DonneesDictionnaire

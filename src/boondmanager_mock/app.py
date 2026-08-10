@@ -59,6 +59,7 @@ from .models import (
     Contrat,
     Cra,
     DonneesTechniques,
+    EnveloppeDictionnaire,
     Facture,
     Frais,
     ItemEnvelope,
@@ -281,7 +282,7 @@ def _collection_items(dataset_key: str) -> list[dict[str, Any]]:
 #  Application
 # ─────────────────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="BoondManager mock", version="0.3.0", docs_url="/docs")
+app = FastAPI(title="BoondManager mock", version="0.5.1", docs_url="/docs")
 api = APIRouter(prefix="/api")
 
 
@@ -690,6 +691,33 @@ def technical_data(request: Request, item_id: str) -> JSONResponse:
         },
     }
     return JSONResponse(envelope_detail(item))
+
+
+@api.get(
+    "/application/dictionary",
+    response_model=EnveloppeDictionnaire,
+    responses=REPONSES_ERREUR,
+    summary="Dictionnaire des énumérations — libellés configurés de l'instance",
+)
+def application_dictionary(request: Request) -> JSONResponse:
+    """Les libellés d'énumération CONFIGURÉS DE L'INSTANCE.
+
+    Objet unique, sans pagination ni `meta`. Partout ailleurs l'API rend des
+    entiers nus : cette route est la seule source connue du rattachement code
+    vers libellé, et les libellés ne sont pas des constantes du produit — deux
+    instances peuvent coder la même notion différemment.
+    """
+    # Trois gestes repris du motif existant, et aucun n'est optionnel :
+    # `_dispatch_injections` — sans lui l'endpoint échapperait au plan de
+    # contrôle et aux modes d'échec injectables ; `_check_auth` AVANT toute
+    # donnée ; et la lecture depuis `state.dataset` plutôt qu'une constante,
+    # c'est ce qui garde le jeu de données comme source unique.
+    injected = _dispatch_injections("/api/application/dictionary", dict(request.query_params))
+    if injected is not None:
+        return injected
+    if (denied := _check_auth(request)) is not None:
+        return denied
+    return JSONResponse({"data": {"setting": state.dataset["dictionary"]}})
 
 
 @api.get(

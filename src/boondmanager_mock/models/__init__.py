@@ -7,6 +7,7 @@ assumé (typer pousse à inventer des champs, et comment on s'en garde).
 
 from .common import (
     REPONSES_ERREUR,
+    EnveloppeDictionnaire,
     ErrorEnvelope,
     ItemEnvelope,
     ListEnvelope,
@@ -57,6 +58,7 @@ __all__ = [
     "Contrat",
     "Cra",
     "DonneesTechniques",
+    "EnveloppeDictionnaire",
     "ErrorEnvelope",
     "Facture",
     "Frais",

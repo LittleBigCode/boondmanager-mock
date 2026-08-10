@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: BoondManager mock
-  version: 0.3.0
+  version: 0.5.1
 paths:
   /health:
     get:
@@ -2193,6 +2193,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ItemEnvelope_DonneesTechniques_'
+        '401':
+          description: No credentials provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Unknown entity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Token present but invalid, missing required parameter (business
+            code 1017), or unreadable pagination parameter. **422, not 401** — that
+            is what the real API does, and the status code is what retry logic keys
+            on.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Rate limit reached. `Retry-After` header in seconds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Injected failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Injected transient failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/application/dictionary:
+    get:
+      summary: Dictionnaire des énumérations — libellés configurés de l'instance
+      description: 'Les libellés d''énumération CONFIGURÉS DE L''INSTANCE.
+
+
+        Objet unique, sans pagination ni `meta`. Partout ailleurs l''API rend des
+
+        entiers nus : cette route est la seule source connue du rattachement code
+
+        vers libellé, et les libellés ne sont pas des constantes du produit — deux
+
+        instances peuvent coder la même notion différemment.'
+      operationId: application_dictionary_api_application_dictionary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnveloppeDictionnaire'
         '401':
           description: No credentials provided.
           content:
@@ -4958,6 +5018,15 @@ components:
       required:
       - id
       title: DetailFraisContrat
+    DonneesDictionnaire:
+      properties:
+        setting:
+          $ref: '#/components/schemas/SettingDictionnaire'
+      additionalProperties: true
+      type: object
+      required:
+      - setting
+      title: DonneesDictionnaire
     DonneesTechniques:
       properties:
         id:
@@ -4975,6 +5044,39 @@ components:
       - id
       - attributes
       title: DonneesTechniques
+    EntreeDictionnaire:
+      properties:
+        id:
+          type: integer
+          title: Id
+          description: Le code numérique que l'API rend sur les autres routes.
+        value:
+          type: string
+          title: Value
+          description: Le libellé configuré, tel qu'il s'affiche dans l'outil.
+      additionalProperties: true
+      type: object
+      required:
+      - id
+      - value
+      title: EntreeDictionnaire
+      description: 'Une correspondance code -> libellé, telle que l''INSTANCE la configure.
+
+
+        C''est la seule source connue du rattachement : partout ailleurs l''API rend
+
+        des entiers nus, et les libellés ne sont pas des constantes du produit.'
+    EnveloppeDictionnaire:
+      properties:
+        data:
+          $ref: '#/components/schemas/DonneesDictionnaire'
+      additionalProperties: true
+      type: object
+      required:
+      - data
+      title: EnveloppeDictionnaire
+      description: '`{"data": {"setting": {...}}}` — objet unique, sans pagination
+        ni `meta`.'
     Erreur:
       properties:
         code:
@@ -6935,6 +7037,66 @@ components:
       - id
       - attributes
       title: Role
+    SettingDictionnaire:
+      properties:
+        state:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/EntreeDictionnaire'
+            type: array
+          type: object
+          title: State
+          x-boond-confidence: invented
+          x-boond-note: Sous-domaines du dictionnaire. La ROUTE n'est attestee par
+            aucun rapport de comparaison ; la forme est de notre fabrication.
+        action:
+          items:
+            $ref: '#/components/schemas/EntreeDictionnaire'
+          type: array
+          title: Action
+        actionOnCandidate:
+          items:
+            $ref: '#/components/schemas/EntreeDictionnaire'
+          type: array
+          title: Actiononcandidate
+          x-boond-confidence: invented
+          x-boond-note: 'Cle INFEREE de la convention de `action` et `actionOnOpportunity`.
+            Ce qui est atteste : une nomenclature d''actions sur candidat existe dans
+            l''instance (feuille Dashb du fichier de mappings).'
+        actionOnOpportunity:
+          items:
+            $ref: '#/components/schemas/EntreeDictionnaire'
+          type: array
+          title: Actiononopportunity
+        origin:
+          items:
+            $ref: '#/components/schemas/EntreeDictionnaire'
+          type: array
+          title: Origin
+      additionalProperties: true
+      type: object
+      required:
+      - state
+      - action
+      - actionOnCandidate
+      - actionOnOpportunity
+      - origin
+      title: SettingDictionnaire
+      description: 'Les nomenclatures, groupées par famille.
+
+
+        `state` est un DICT de sous-domaines (opportunity, candidate, resource) ;
+
+        les autres familles sont des listes plates. Les deux formes coexistent chez
+
+        l''éditeur — les uniformiser ici ferait diverger le mock du dialecte réel.
+
+
+        `action` et `actionOnOpportunity` sont deux nomenclatures DISTINCTES qui
+
+        partagent des libellés sous des codes différents. Les fondre ferait traduire
+
+        un type d''action de besoin par un libellé général.'
     Societe:
       properties:
         id:

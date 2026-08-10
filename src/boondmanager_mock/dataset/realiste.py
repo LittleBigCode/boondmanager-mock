@@ -364,9 +364,29 @@ _TYPES_FRAIS = [
 ]
 
 # Sémantique de dictionnaire PLAUSIBLE (propre à l'instance — non attestée) :
-ETAT_RESSOURCE_SORTIE = 0
-ETAT_RESSOURCE_ACTIVE = 1
-ETAT_RESSOURCE_INTEGRATION = 2
+# Les SIX états de l'instance (feuille INDEX du fichier de mappings, colonne
+# IN/OUT/NEW). Un seul est sortant — « OFF » : un collaborateur en congé longue
+# durée ou en préavis compte toujours dans l'effectif.
+#
+# ⚠️ LES ENTIERS RESTENT CEUX DU MOCK, ET ILS NE SONT PAS ATTESTÉS — pas plus
+# qu'avant. Ce que ce bloc apporte, c'est le NOMBRE d'états et leur SÉMANTIQUE,
+# les deux sourcés par la feuille INDEX. La correspondance code ↔ libellé, elle,
+# ne se lit que dans `GET /application/dictionary`.
+#
+# La tentation était d'aligner sur le préfixe des libellés (« 06 - OFF » → 6),
+# comme pour les opportunités. Elle est écartée : `stg_collaborateur.sql` a déjà
+# tranché que ce préfixe est une convention d'AFFICHAGE. Pour les opportunités,
+# deux sources indépendantes concordaient — le process Confluence ET l'export ;
+# ici il n'y a que le préfixe, et une concordance ne fait pas une règle.
+#
+# Ce qui compte pour un mock : être cohérent avec son propre dictionnaire. Il
+# l'est — le bloc ② déclare ces six entiers-là.
+ETAT_RESSOURCE_SORTIE = 0  # OFF                      -> OUT
+ETAT_RESSOURCE_ACTIVE = 1  # STAFFED                  -> IN
+ETAT_RESSOURCE_INTEGRATION = 2  # HIRED - ONBOADING PHASE  -> NEW
+ETAT_RESSOURCE_INTERCONTRAT = 3  # UN/IC - UNASIGNED [8 W]  -> IN
+ETAT_RESSOURCE_CONGE_LONG = 4  # LONG TERM LEAVE          -> IN
+ETAT_RESSOURCE_PREAVIS = 5  # LEAVING COMPANY          -> IN
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -517,6 +537,30 @@ _MOIS_MUTATION = 6
 _MOIS_SORTIE = 5
 
 
+def _etat_ressource(i: int, *, sorti: bool, integration: bool) -> int:
+    """L'etat d'une ressource, dans la nomenclature a SIX valeurs de l'instance.
+
+    Un seul etat est sortant. Un collaborateur en intercontrat, en conge longue
+    duree ou en preavis compte toujours dans l'effectif — c'est le regroupement
+    IN/OUT/NEW de la feuille INDEX.
+
+    Les identifiants d'intercontrat sont ceux sur lesquels `en_intercontrat` est
+    deja calcule plus bas : l'information existait dans le jeu sans que l'API la
+    rende jamais.
+    """
+    if sorti:
+        return ETAT_RESSOURCE_SORTIE
+    if integration:
+        return ETAT_RESSOURCE_INTEGRATION
+    if i in (25, 26, 29, 30):
+        return ETAT_RESSOURCE_INTERCONTRAT
+    if i == 11:
+        return ETAT_RESSOURCE_CONGE_LONG
+    if i == 12:
+        return ETAT_RESSOURCE_PREAVIS
+    return ETAT_RESSOURCE_ACTIVE
+
+
 def _ressources(rng: random.Random) -> list[dict[str, Any]]:
     ressources: list[dict[str, Any]] = []
     for i in range(1, _NB_RESSOURCES + 1):
@@ -560,11 +604,7 @@ def _ressources(rng: random.Random) -> list[dict[str, Any]]:
             senior = "senior" in titre or "Lead" in titre or experience >= 8
             tjm = float(rng.choice([780, 850, 920] if senior else [520, 580, 640, 700]))
 
-        etat = (
-            ETAT_RESSOURCE_SORTIE
-            if sorti
-            else (ETAT_RESSOURCE_INTEGRATION if integration else ETAT_RESSOURCE_ACTIVE)
-        )
+        etat = _etat_ressource(i, sorti=sorti, integration=integration)
         courriel = f"{prenom.lower()}.{nom.lower()}@boreal-conseil.example"
         if i == _IDS_HOMONYMES[1]:
             # Résolution de collision par ordinal. Le SECOND porte le suffixe :
@@ -836,7 +876,11 @@ def _candidats(rng: random.Random) -> list[dict[str, Any]]:
                     ],
                     "diplomas": [rng.choice(_DIPLOMES)],
                     "activityAreas": rng.sample(_SECTEURS, k=2),
-                    "globalEvaluation": rng.choice(["3.5", "4.0", "4.5", ""]),
+                    # Le guide utilisateur signale MOINS DE 2 % de candidats notes en
+                    # production. Une chaine vide n'est PAS un nul : elle compte
+                    # comme une note pour qui teste la presence, et masque le
+                    # defaut de qualite que le modele doit exposer.
+                    "globalEvaluation": "4.0" if i == 1 else ("3.5" if i == 5 else None),
                     "languages": [
                         {"language": code, "level": niveau}
                         for code, niveau in rng.sample(_LANGUES, k=2)
@@ -1002,11 +1046,16 @@ def _opportunites(
 ) -> list[dict[str, Any]]:
     """15 opportunités : 6 gagnées (→ projets), 5 en cours, 3 perdues, 1 en veille.
 
-    États retenus (dictionnaire d'instance, sémantique plausible) :
-    1 = en cours de qualification, 2 = proposition envoyée, 3 = négociation,
-    4 = gagnée, 5 = perdue, 6 = en veille.
+    États alignés sur l'INSTANCE RÉELLE, observés dans l'export « Besoins »
+    du fichier de mappings (08 - LOST, 09 - POSTPONED / ABANDONED) et conformes
+    au process Confluence « BOOND - Need creation & Management » :
+    1 Open · 2 Qualified · 3 Proposed solution · 7 WON · 8 LOST · 9 POSTPONED.
+
+    Le mock codait 4/5/6, ce qui n'existe nulle part dans l'instance : un
+    consommateur qui écrivait « état = 4 → gagnée » produisait un chiffre juste
+    en dev et faux en production, sans que rien ne le signale.
     """
-    plan = [4, 4, 4, 4, 4, 4, 1, 2, 2, 3, 1, 5, 5, 5, 6]
+    plan = [7, 7, 7, 7, 7, 7, 1, 2, 2, 3, 1, 8, 8, 8, 9]
     opportunites: list[dict[str, Any]] = []
     for i, etat in enumerate(plan, start=1):
         societe = societes[(i * 3) % 10]
@@ -1016,12 +1065,12 @@ def _opportunites(
         contact = rng.choice(contacts_societe) if contacts_societe else None
         sujet, outils = _SUJETS[(i * 5) % len(_SUJETS)]
         creation = date(2025, ((i * 7) % 12) + 1, rng.randint(2, 26))
-        perdue = etat == 5
+        perdue = etat == 8
         mode = 1 if i % 3 else 2  # 1 = assistance technique, 2 = forfait
         jours = rng.choice([120, 180, 240, 300])
         tjm_moyen = rng.choice([620, 680, 750, 820])
         estime = float(jours * tjm_moyen)
-        proba = {1: 0.3, 2: 0.5, 3: 0.7, 4: 1.0, 5: 0.0, 6: 0.1}[etat]
+        proba = {1: 0.3, 2: 0.5, 3: 0.7, 7: 1.0, 8: 0.0, 9: 0.1}[etat]
         cloture = creation + timedelta(days=rng.randint(30, 120))
         opportunites.append(
             {
@@ -1105,7 +1154,7 @@ def _projets(
     pilotent missions, CRA et factures.
     """
     projets = []
-    gagnees = [o for o in opportunites if o["attributes"]["state"] == 4]
+    gagnees = [o for o in opportunites if o["attributes"]["state"] == 7]
     for i in range(1, 13):
         if i <= len(gagnees):
             opp = gagnees[i - 1]
@@ -2139,18 +2188,61 @@ def _actions(
         )
         ident += 1
 
+    # Une seule action par candidat, toujours du même type, ne laisse RIEN à
+    # reconstituer : ni dates d'étape, ni durées, ni « time to hire ». Un
+    # consommateur calcule alors une durée de parcours de zéro jour sur tous les
+    # candidats — et une colonne pleine de zéros se lit comme une donnée, pas
+    # comme un manque.
+    #
+    # Les rythmes VARIENT délibérément : des délais identiques rendraient toute
+    # moyenne artificielle. C'est la dispersion qui rend un jeu d'essai utile.
+    _ETAPES = [
+        (1, "Prequalification telephonique — profil coherent avec le besoin."),
+        (2, "ITW 1 — parcours et motivations, retour favorable."),
+        (3, "ITW 2 technique — mise en situation sur un cas data."),
+        (4, "Prise de references aupres de l'ancien manager."),
+        (5, "ITW 3 avec la direction de practice."),
+        (6, "Proposition transmise."),
+    ]
+    # Délais en jours depuis la création. La LONGUEUR de la liste décide où le
+    # parcours s'arrête : 3 complets, 2 stoppés en ITW 2, 2 en cours, 1 vivier.
+    _RYTHMES = {
+        1: [7, 14, 22, 30, 38, 52],
+        2: [5, 19, 33, 47, 61, 90],
+        3: [9, 16, 24, 31, 40, 55],
+        4: [6, 13, 21],
+        5: [11, 25, 38],
+        6: [8, 20],
+        7: [12],
+        8: [7, 15, 23, 29],
+    }
     for candidat in candidats:
-        jour = date.fromisoformat(candidat["attributes"]["creationDate"][:10]) + timedelta(days=7)
-        _ajouter(
-            "candidate",
-            candidat["id"],
-            4,
-            f"Entretien technique avec {candidat['attributes']['firstName']} "
-            f"{candidat['attributes']['lastName']} — retour globalement positif.",
-            jour=jour,
-            manager=rng.choice((2, 4, 6)),
-            societe_id=None,
-        )
+        cid = int(candidat["id"])
+        creation = date.fromisoformat(candidat["attributes"]["creationDate"][:10])
+        rythme = _RYTHMES.get(cid)
+        if rythme is None:
+            # Les autres gardent une action unique : un jeu où TOUS ont un
+            # parcours complet serait aussi irréaliste qu'un jeu où aucun n'en a.
+            _ajouter(
+                "candidate",
+                candidat["id"],
+                1,
+                "Prequalification telephonique — a recontacter.",
+                jour=creation + timedelta(days=7),
+                manager=rng.choice((2, 4, 6)),
+                societe_id=None,
+            )
+            continue
+        for (type_of, texte), delai in zip(_ETAPES, rythme, strict=False):
+            _ajouter(
+                "candidate",
+                candidat["id"],
+                type_of,
+                texte,
+                jour=creation + timedelta(days=delai),
+                manager=rng.choice((2, 4, 6)),
+                societe_id=None,
+            )
     for contact in contacts[:12]:
         jour = date(2026, rng.randint(2, 7), rng.randint(1, 26))
         _ajouter(
@@ -2312,6 +2404,113 @@ def _remuneration(
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+def _dictionnaire() -> dict[str, Any]:
+    """Les libellés d'énumération CONFIGURÉS DE L'INSTANCE.
+
+    L'API rend des entiers ; les libellés ne sont pas des constantes du produit.
+    `GET /application/dictionary` est le seul endroit qui les donne, et sans lui
+    aucun consommateur ne peut traduire un code.
+
+    Deux formes coexistent volontairement — dict de sous-domaines pour `state`,
+    liste pour le reste. C'est ce que décrit la documentation de l'éditeur.
+
+    ⚠️ `action` et `actionOnOpportunity` sont DEUX clés distinctes. L'instance
+    porte deux nomenclatures d'actions qui partagent des libellés sous des codes
+    différents (« TOUCH POINT » existe en 01 et en 09, avec deux sens) : les
+    fondre ferait traduire un type d'action de besoin par un libellé général.
+
+    Les valeurs décrivent les codes que le mock REND — un dictionnaire qui ne
+    correspond pas au jeu ferait passer les tests avec des traductions fausses,
+    ce qui est pire qu'un mock muet. Le test de couverture l'assure.
+    """
+    return {
+        "state": {
+            "opportunity": [
+                {"id": 1, "value": "Open"},
+                {"id": 2, "value": "Qualified (working on solution)"},
+                {"id": 3, "value": "Proposed solution"},
+                {"id": 7, "value": "WON"},
+                {"id": 8, "value": "LOST"},
+                {"id": 9, "value": "POSTPONED / ABANDONED"},
+            ],
+            "candidate": [
+                {"id": 0, "value": "SOURCED"},
+                {"id": 1, "value": "PREQUAL [1ST CONTACT]"},
+                {"id": 2, "value": "ITW 1 [TA/BM]"},
+                {"id": 3, "value": "ITW 2 [TECH/BUSINESS]"},
+                {"id": 4, "value": "REFERENCE CHECK"},
+                {"id": 5, "value": "ITW 3 [DIR/PARTNER]"},
+            ],
+            # LES SIX ÉTATS, parce que le jeu en rend six depuis le bloc ③.
+            # Il n'en déclarait que trois : un dictionnaire qui ne couvre pas
+            # son propre jeu fait passer les tests avec des traductions
+            # manquantes — le défaut que cette docstring interdit deux lignes
+            # plus haut.
+            #
+            # ⚠️ LA NUMÉROTATION RESTE CELLE DU MOCK, ET ELLE N'EST PAS
+            # ATTESTÉE. La feuille INDEX numérote les libellés de 01 à 06, mais
+            # `stg_collaborateur.sql` a déjà tranché que ce préfixe est une
+            # CONVENTION D'AFFICHAGE de l'instance, pas l'entier rendu par
+            # l'API. Pour les opportunités, deux sources indépendantes
+            # concordaient — le process Confluence ET l'export. Ici il n'y a
+            # que le préfixe : une concordance ne fait pas une règle.
+            #
+            # Cette route est précisément ce qui tranchera la question le jour
+            # où elle interrogera l'instance réelle. D'ici là, le mock est
+            # cohérent avec lui-même, et c'est tout ce qu'un mock doit garantir.
+            "resource": [
+                {"id": 0, "value": "OFF"},
+                {"id": 1, "value": "STAFFED"},
+                {"id": 2, "value": "HIRED - ONBOADING PHASE"},
+                {"id": 3, "value": "UN/IC - UNASIGNED [From 8 W to now]"},
+                {"id": 4, "value": "LONG TERM LEAVE"},
+                {"id": 5, "value": "LEAVING COMPANY"},
+            ],
+        },
+        "action": [
+            {"id": 1, "value": "TODO / Reminder"},
+            {"id": 2, "value": "Touch point"},
+            {"id": 3, "value": "1st Prospection meeting"},
+            {"id": 4, "value": "DVP"},
+            {"id": 5, "value": "Project review meeting"},
+            {"id": 6, "value": "Client presentation / defense"},
+            {"id": 7, "value": "Manifesto client"},
+        ],
+        # ⚠️ CLÉ INFÉRÉE, et il faut le savoir. `action` et `actionOnOpportunity`
+        # sont attestées ; celle-ci ne l'est pas — c'est le nom que suggère la
+        # convention des deux autres. Ce qui EST attesté, c'est qu'une
+        # nomenclature d'actions sur candidat existe dans l'instance : la
+        # feuille `Dashb` du fichier de mappings en compte les volumes sur 31
+        # semaines (1 006 ITW1, 260 ITW2, 54 ITW3, 248 PREQUAL).
+        #
+        # Elle est déclarée parce que le bloc ④ fait émettre ces six types :
+        # un dictionnaire muet sur ce que son propre jeu produit est le défaut
+        # que cette docstring interdit. Si l'instance nomme la clé autrement,
+        # c'est un renommage — pas une reprise du raisonnement.
+        "actionOnCandidate": [
+            {"id": 1, "value": "PREQUAL [1ST CONTACT]"},
+            {"id": 2, "value": "ITW 1 [TA/BM]"},
+            {"id": 3, "value": "ITW 2 [TECH/BUSINESS]"},
+            {"id": 4, "value": "REFERENCE CHECK"},
+            {"id": 5, "value": "ITW 3 [DIR/PARTNER]"},
+            {"id": 6, "value": "PROPOSITION"},
+        ],
+        "actionOnOpportunity": [
+            {"id": 1, "value": "NEED STUDY / QUALIFICATION"},
+            {"id": 2, "value": "CLIENT PRESENTATION / DEFENSE"},
+            {"id": 3, "value": "CLOSING"},
+            {"id": 4, "value": "TODO"},
+        ],
+        "origin": [
+            {"id": 1, "value": "Site carrière"},
+            {"id": 2, "value": "LinkedIn"},
+            {"id": 3, "value": "Cooptation"},
+            {"id": 4, "value": "Chasse"},
+            {"id": 5, "value": "Salon Big Data Paris"},
+        ],
+    }
+
+
 def build_realiste_dataset(seed: int = 42) -> dict[str, Any]:
     rng = random.Random(seed)
 
@@ -2400,4 +2599,5 @@ def build_realiste_dataset(seed: int = 42) -> dict[str, Any]:
         "times_reports": cras,
         "technical_data": donnees_techniques,
         "remuneration": _remuneration(ressources, contrats, agences),
+        "dictionary": _dictionnaire(),
     }

@@ -149,3 +149,23 @@ resource profile: official keys, FABRICATED deterministic values.
 
 The dataset evolves (see `evolution.py`). `BOOND_MOCK_EVOLUTION=false`
 freezes everything. The real API moves because humans are working.
+
+
+### 6. `GET /application/dictionary` — route ajoutée, forme inventée
+
+`state`, `actionOnCandidate` (`invented`).
+
+The endpoint is **not attested by any comparison report** (2026-07-31,
+2026-08-04 probed 19 modules; this route was not among them). Its existence is
+plausible — this very document already points to it as the source of
+per-instance semantics (§4) — but the **shape of the response is ours**, and the
+`actionOnCandidate` key is inferred from the convention of `action` and
+`actionOnOpportunity`.
+
+What IS attested: an action nomenclature for candidates exists in the tenant —
+the `Dashb` sheet of the mappings file counts its volumes over 31 weeks
+(PREQUAL, ITW1, ITW2, ITW3).
+
+Consumers must treat the shape as provisional until a comparison run covers it.
+The codes served match the dataset by construction — a static control enforces
+it (`controler_dictionnaire_mock.py` on the insights360 side).
