@@ -180,6 +180,33 @@ _NOMS = [
     "Faure",
     "Bourgeois",
 ]
+#: Les fonctions SUPPORT, par identifiant de ressource.
+#:
+#: Le jeu ne produisait que des consultants et des managers : les seize types
+#: de la feuille INDEX n'en voyaient que trois. Le fichier de mappings decrit
+#: pourtant une organisation ou le STAFF pese un tiers de l'effectif —
+#: recrutement, RH, finance, marketing, administratif.
+#:
+#: Les INTITULES sont ceux du referentiel `ref_type_collaborateur` cote
+#: insights360 : c'est lui qui rattache un intitule de poste a son type, et la
+#: correspondance se fait sur la CHAINE. Changer un libelle ici sans le changer
+#: la-bas casse le rattachement en silence — le collaborateur ressort avec un
+#: type nul, et rien ne le signale.
+#:
+#: ⚠️ IDENTIFIANTS CHOISIS HORS DE TOUTE FIXTURE. 11 est `kevin.silva` cote
+#: insights360, 12 et 17 portent des etats particuliers, 1 et 2-6 sont la
+#: direction et les managers, 22-34 sont reserves cote mock. 0.5.3 avait pose
+#: un etat sur 11 et fait tomber un test negatif sans rapport : l'inventaire se
+#: refait a chaque patch.
+_TITRES_SUPPORT = {
+    8: "Responsable acquisition de talents",
+    10: "Chargé de recrutement",
+    13: "Responsable ressources humaines",
+    16: "Contrôleur de gestion",
+    19: "Chargé de communication",
+    20: "Assistant administratif",
+}
+
 _TITRES_CONSULTANT = [
     "Data Engineer",
     "Data Engineer senior",
@@ -662,7 +689,13 @@ def _ressources(rng: random.Random) -> list[dict[str, Any]]:
         elif est_manager:
             titre = rng.choice(["Directeur d'agence", "Manager de BU", "Directrice des opérations"])
         else:
-            titre = rng.choice(_TITRES_CONSULTANT)
+            # Le STAFF d'abord, le consultant en repli. Ecrit en TERNAIRE et non
+            # en `elif` : la branche supplementaire faisait passer la fonction a
+            # 13 embranchements, au-dessus du seuil PLR0912 du depot. Le `if`
+            # garde l'appel a rng.choice hors du chemin support — l'appeler pour
+            # rien decalerait la sequence aleatoire et changerait les titres de
+            # TOUS les autres consultants.
+            titre = _TITRES_SUPPORT[i] if i in _TITRES_SUPPORT else rng.choice(_TITRES_CONSULTANT)
 
         if integration:
             embauche = date(2026, 7, 1)
