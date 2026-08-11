@@ -153,7 +153,14 @@ freezes everything. The real API moves because humans are working.
 
 ### 6. `GET /application/dictionary` — route ajoutée, forme inventée
 
-`state`, `actionOnCandidate` (`invented`).
+`state`, `actionOnCandidate`, `typeOf` (`invented`).
+
+`typeOf` was added in 0.5.5, mirroring `state`. What is attested: the API
+returns an integer `typeOf` on resource, candidate, opportunity, project and
+purchase, and gives its label nowhere else. The SHAPE is ours, exactly like
+`state`. Its `resource` sub-domain is the one entry of the whole route that is
+proven rather than inferred: six mock tests establish that `typeOf` carries
+employee/subcontractor and drives contract generation.
 
 The endpoint is **not attested by any comparison report** (2026-07-31,
 2026-08-04 probed 19 modules; this route was not among them). Its existence is

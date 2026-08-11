@@ -124,6 +124,20 @@ def _au_banc(dataset: dict[str, Any]) -> list[dict[str, Any]]:
     return [r for r in _actifs(dataset) if r["attributes"].get("availability") == "immediate"]
 
 
+#: L'etat « WON » de la nomenclature de l'instance. Le mock a longtemps code 4,
+#: ce qui n'existe nulle part : deux sources independantes — le process
+#: Confluence et l'export metier — donnent 7 (cf. patch 0.5.1).
+ETAT_OPPORTUNITE_GAGNEE = 7
+
+#: Comment une affaire avance. Explicite plutot qu'arithmetique : la
+#: nomenclature saute de 3 a 7, et tout calcul sur l'entier le manque.
+TRANSITION_OPPORTUNITE = {
+    1: 2,  # Open                      -> Qualified (working on solution)
+    2: 3,  # Qualified                 -> Proposed solution
+    3: ETAT_OPPORTUNITE_GAGNEE,  # Proposed solution -> WON
+}
+
+
 class Evolution:
     """La chronologie d'événements d'une instance, réarmée à chaque reset."""
 
@@ -421,9 +435,15 @@ class Evolution:
             return ""
         opp = ouvertes[k % len(ouvertes)]
         attrs = opp["attributes"]
-        attrs["state"] += 1
+        # LA NOMENCLATURE N'EST PAS CONTIGUE, et `+= 1` le supposait. Apres 3
+        # (Proposed solution) vient 7 (WON) : incrementer produisait un etat 4
+        # que l'instance ne connait pas, que le dictionnaire ne declare pas, et
+        # que fct_opportunite ne range ni en gagne, ni en perdu, ni en cours.
+        # La transition est donc NOMMEE, et elle echoue bruyamment si un etat
+        # inattendu arrive — un KeyError se voit, un compteur faux non.
+        attrs["state"] = TRANSITION_OPPORTUNITE[attrs["state"]]
         attrs["updateDate"] = _ts(age)
-        if attrs["state"] == 4:  # gagnée
+        if attrs["state"] == ETAT_OPPORTUNITE_GAGNEE:
             attrs["closingDate"] = _jour(age)
             attrs["turnoverWeightedExcludingTax"] = attrs["turnoverEstimatedExcludingTax"]
             societe_id = opp["relationships"]["company"]["data"]["id"]

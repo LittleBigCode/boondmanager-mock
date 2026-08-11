@@ -220,6 +220,15 @@ class SettingDictionnaire(Permissif):
     )
     actionOnOpportunity: list[EntreeDictionnaire]
     origin: list[EntreeDictionnaire]
+    typeOf: dict[str, list[EntreeDictionnaire]] = Field(
+        default_factory=dict,
+        json_schema_extra=invented(
+            "Symetrique de `state`. Ce qui est atteste : l'API rend un `typeOf` "
+            "entier sur resource, candidate, opportunity, project et purchase, "
+            "et n'en donne le libelle nulle part ailleurs. La FORME est de notre "
+            "fabrication, comme celle de `state`."
+        ),
+    )
 
 
 class DonneesDictionnaire(Permissif):

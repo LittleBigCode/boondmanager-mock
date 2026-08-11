@@ -7073,6 +7073,18 @@ components:
             $ref: '#/components/schemas/EntreeDictionnaire'
           type: array
           title: Origin
+        typeOf:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/EntreeDictionnaire'
+            type: array
+          type: object
+          title: Typeof
+          x-boond-confidence: invented
+          x-boond-note: 'Symetrique de `state`. Ce qui est atteste : l''API rend un
+            `typeOf` entier sur resource, candidate, opportunity, project et purchase,
+            et n''en donne le libelle nulle part ailleurs. La FORME est de notre fabrication,
+            comme celle de `state`.'
       additionalProperties: true
       type: object
       required:

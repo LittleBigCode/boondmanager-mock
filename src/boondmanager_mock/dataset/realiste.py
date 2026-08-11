@@ -2498,6 +2498,107 @@ def _dictionnaire() -> dict[str, Any]:
                 {"id": 4, "value": "LONG TERM LEAVE"},
                 {"id": 5, "value": "LEAVING COMPANY"},
             ],
+            # ── Les sous-domaines ajoutes en 0.5.5 ───────────────────────────
+            # Le mock rendait ces entiers sans que rien ne puisse les traduire.
+            # Chaque libelle vient d'une branche du jeu, citee en commentaire.
+            #
+            # `"state": 0 if prospect else 1` dans _societes.
+            "company": [
+                {"id": 0, "value": "Prospect"},
+                {"id": 1, "value": "Client"},
+            ],
+            # ⚠️ CONSTANTE MUETTE. _contacts pose `"state": 1` pour tous les
+            # contacts, sans branche qui en donne le sens. Le libelle est de
+            # notre fabrication : il rend le code traduisible, il ne l'atteste
+            # pas. Le guide Boond decrit une qualification de contact
+            # (Decision maker / Influencer / Buyer / Inactive) mais ne donne
+            # AUCUN code — la colonne `code` du referentiel de repli est vide,
+            # et le rester est deliberé.
+            "contact": [
+                {"id": 1, "value": "Active"},
+            ],
+            # ⚠️ CONSTANTE MUETTE — _commandes pose `"state": 1` partout.
+            "order": [
+                {"id": 1, "value": "Validated"},
+            ],
+            # ⚠️ CONSTANTE MUETTE — _achats pose `"state": 1` sur les deux
+            # familles d'achats, ceux rattaches a une mission et les generaux.
+            "purchase": [
+                {"id": 1, "value": "Validated"},
+            ],
+            # `reglees = [f for f in factures if f["attributes"]["state"] == 2]`
+            # et `"closed": etat == 2` dans _factures : 2 est l'etat terminal.
+            # 0 est l'etat des factures ni envoyees ni payees, 1 celui des
+            # factures envoyees en attente de reglement.
+            "invoice": [
+                {"id": 0, "value": "Draft"},
+                {"id": 1, "value": "Sent"},
+                {"id": 2, "value": "Paid"},
+            ],
+            # `"state": 1 if effectue else 0` dans _paiements.
+            "payment": [
+                {"id": 0, "value": "Pending"},
+                {"id": 1, "value": "Executed"},
+            ],
+            # `"state": 2 if rapprochee else 0` dans _banque. Le 1 n'est jamais
+            # rendu : on ne le declare donc pas. Un dictionnaire qui annonce
+            # des codes que le jeu ne produit pas est aussi trompeur que
+            # l'inverse — il laisse croire a une couverture qui n'existe pas.
+            "bankingTransaction": [
+                {"id": 0, "value": "Not reconciled"},
+                {"id": 2, "value": "Reconciled"},
+            ],
+            # `"state": 1 if fin_projet >= AUJOURDHUI else 2` dans _missions.
+            # La ROUTE de liste des livraisons repond 405 chez l'editeur — seul
+            # le detail existe — mais l'objet porte bien cet etat, et les marts
+            # le consomment via le projet.
+            "delivery": [
+                {"id": 1, "value": "In progress"},
+                {"id": 2, "value": "Completed"},
+            ],
+        },
+        # ── `typeOf`, symetrique de `state` ─────────────────────────────────
+        #
+        # ⚠️ LA FORME EST DE NOTRE FABRICATION, comme `state` avant elle. Ce qui
+        # est atteste : l'API rend un `typeOf` entier sur cinq familles d'objets
+        # et n'en donne le libelle nulle part ailleurs. Marquee `invented` dans
+        # le modele et dans docs/UNVERIFIED-FIELDS.md.
+        "typeOf": {
+            # PROUVE, et c'est le seul de ce bloc a l'etre : six tests du mock
+            # etablissent que `typeOf` porte salarie/sous-traitant et pilote la
+            # generation des contrats. Ce n'est PAS la nomenclature des seize
+            # types de la feuille INDEX — une premiere version de ce patch le
+            # supposait, les tests l'ont dementie.
+            "resource": [
+                {"id": 0, "value": "Employee"},
+                {"id": 1, "value": "Subcontractor"},
+            ],
+            # ⚠️ CONSTANTE MUETTE — _candidats pose `"typeOf": 0` partout.
+            "candidate": [
+                {"id": 0, "value": "Default"},
+            ],
+            # ⚠️ CONSTANTE MUETTE — _opportunites pose `"typeOf": 1` sur la
+            # route de liste.
+            "opportunity": [
+                {"id": 1, "value": "Default"},
+            ],
+            # `mode = 1 if i % 3 else 2` et le commentaire du jeu, mot pour
+            # mot : « 1 = assistance technique, 2 = forfait ». _projets recopie
+            # ce mode dans `typeOf`.
+            "project": [
+                {"id": 1, "value": "Technical assistance"},
+                {"id": 2, "value": "Fixed price"},
+            ],
+            # La table `generaux` de _achats porte le type en 3e colonne :
+            # licences et abonnements en 2, loyers en 3, materiel en 4. Le 0
+            # est celui des achats rattaches a une mission, donc de la
+            # sous-traitance.
+            "purchase": [
+                {"id": 0, "value": "Subcontracting"},
+                {"id": 2, "value": "Software and licenses"},
+                {"id": 3, "value": "Premises"},
+                {"id": 4, "value": "Equipment"},
+            ],
         },
         "action": [
             {"id": 1, "value": "TODO / Reminder"},
