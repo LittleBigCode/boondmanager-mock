@@ -274,6 +274,51 @@ _AGENCES = [
         "FR 62 482154796",
         5,
     ),
+    # ── Les deux entites etrangeres, et le DOUBLON deliberé ──────────────────
+    #
+    # ⚠️ CES DEUX PREMIERES LIGNES SONT UN CAS DE TEST, PAS DU REMPLISSAGE.
+    # Le fichier de mappings montre la meme mecanique sur l'organisation
+    # reelle : une entite majeure et son alias minoritaire, separes par un
+    # suffixe juridique. `acl_role_perimetre` visant l'entite PAR SON LIBELLE,
+    # une regle ecrite sur l'une exclut silencieusement les personnes de
+    # l'autre — elles ne voient rien, personne ne les voit, et aucun compteur
+    # ne bouge.
+    #
+    # `obs_entites_similaires` existe pour attraper ca et rendait ZERO paire,
+    # faute de doublon dans le jeu. Il en a un maintenant.
+    #
+    # Les NOMS sont ceux du monde fictif : DATA-01 interdit le nom d'une
+    # entite juridique reelle dans le depot. Seule la MECANIQUE est reprise.
+    (
+        "Boreal Conseil Bogota S.A.S",
+        "Bogota",
+        "110111",
+        "Carrera 11 #93-46",
+        "901 254 883-1",
+        "CO 901254883",
+        6,
+    ),
+    (
+        "Boreal Conseil Bogota",
+        "Bogota",
+        "110111",
+        "Carrera 11 #93-46",
+        "901 254 883-1",
+        "CO 901254883",
+        2,
+    ),
+    # Une troisieme zone, pour que l'isolement entre PAYS cesse d'etre vacant :
+    # tant qu'il n'y a qu'un pays, aucun test d'etancheite geographique ne
+    # prouve quoi que ce soit — il passe faute de contre-exemple.
+    (
+        "Boreal Conseil Montreal",
+        "Montreal",
+        "H3B 2S2",
+        "1250 boulevard Rene-Levesque O",
+        "1148765432 RC0001",
+        "CA 114876543",
+        4,
+    ),
 ]
 _BUSINESS_UNITS = ["Data & IA", "Cloud & Plateformes", "Cybersécurité", "Transformation digitale"]
 _POLES = [
