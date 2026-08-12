@@ -142,6 +142,18 @@ API for « always returning a full page » — the API was paginating correctly.
 Same family as the period filter ignored on `/times`: a parameter accepted and
 silently dropped is worse than one rejected, because nothing signals it.
 
+### 1.bis `opportunities.startDate` may be the literal `immediate`
+
+Not an edge case: **1 523 of the 1 850** production opportunities (82 %) carry
+the string instead of a date. The mock only ever served dates, so
+`stg_opportunite` cast the column unguarded and broke on *« invalid input syntax
+for type date: "immediate" »*.
+
+The dialect reuses that same literal for a **resource**'s `availability` (105 of
+364 in production). Treat it as a general rule: any start-date field may carry
+it, and nulling it silently would discard the dominant value of the field —
+an immediate need is a signal, not a missing date.
+
 ### 1.c `candidates.availability` is a CODE — **corrected in 0.6.0**
 
 On a **candidate**, `availability` is an integer: probed over 26 814 production

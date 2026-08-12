@@ -522,7 +522,16 @@ class AttributsOpportunite(AttributsBase):
     state: int | None = None
     place: str | None = None
     isVisible: bool | None = None
-    startDate: str | None = None
+    startDate: str | None = Field(
+        default=None,
+        description=(
+            "A DATE **or** the literal string `immediate` — 1 523 of the "
+            "1 850 production opportunities (82 %) carry the latter. Casting "
+            "this field to a date without guarding the literal fails on « "
+            "invalid input syntax for type date ». The dialect reuses the same "
+            "literal for a resource's `availability`."
+        ),
+    )
     endDate: str | None = None
     closingDate: str | None = None
     answerDate: str | None = None

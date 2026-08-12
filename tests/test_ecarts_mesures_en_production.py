@@ -158,7 +158,35 @@ def test_les_autres_collections_honorent_maxresults(client):
         )
 
 
-# ── 4. `availability` d'un CANDIDAT est un code, pas une date ────────────────
+# ── 4. `startDate` d'un BESOIN peut valoir « immediate » ─────────────────────
+
+
+def test_le_debut_d_un_besoin_peut_etre_la_chaine_immediate(client):
+    """1 523 des 1 850 besoins de production portent « immediate », soit 82 %.
+
+    Ce n'est donc pas un cas limite mais le cas DOMINANT. Le mock ne servait que
+    des dates, si bien que `stg_opportunite` castait sans filet et tombait sur
+    « invalid input syntax for type date: "immediate" ».
+
+    La proportion compte autant que la présence : un jeu où le cas majoritaire
+    est minoritaire laisse passer les modèles qui ne le gèrent pas.
+    """
+    lignes = _premiers(client, "opportunities", maxResults=500)
+    debuts = [ligne["attributes"].get("startDate") for ligne in lignes]
+    renseignes = [d for d in debuts if d]
+
+    assert "immediate" in renseignes, "le littéral doit être présent"
+    immediats = sum(1 for d in renseignes if d == "immediate")
+    assert immediats > len(renseignes) / 2, (
+        f"« immediate » doit être MAJORITAIRE ({immediats}/{len(renseignes)}) — "
+        "c'est ce que rend la production"
+    )
+    assert any(d != "immediate" for d in renseignes), (
+        "des dates réelles doivent subsister : les deux formes coexistent"
+    )
+
+
+# ── 5. `availability` d'un CANDIDAT est un code, pas une date ────────────────
 
 
 def test_la_disponibilite_d_un_candidat_est_un_code_entier(client):

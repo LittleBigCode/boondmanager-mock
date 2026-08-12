@@ -1201,7 +1201,31 @@ def _opportunites(
                     "state": etat,
                     "place": societe["attributes"]["town"],
                     "isVisible": True,
-                    "startDate": _d(cloture + timedelta(days=30)) if not perdue else "",
+                    # ┌─ `startDate` N'EST PAS TOUJOURS UNE DATE ───────────┐
+                    # │ Sur un BESOIN, le fournisseur rend la chaîne         │
+                    # │ littérale « immediate » quand le démarrage est       │
+                    # │ immédiat. Et ce n'est pas un cas limite : 1 523 des  │
+                    # │ 1 850 besoins de production, soit 82 %.              │
+                    # │                                                      │
+                    # │ Le mock ne servait que des dates, si bien que        │
+                    # │ `stg_opportunite` castait sans filet et tombait sur  │
+                    # │ « invalid input syntax for type date: "immediate" ». │
+                    # │                                                      │
+                    # │ Même valeur, même sens que l'`availability` d'une    │
+                    # │ RESSOURCE — le dialecte réutilise ce littéral pour   │
+                    # │ « tout de suite » partout où une date est attendue.  │
+                    # │ Un consommateur doit donc le prévoir sur TOUT champ  │
+                    # │ de date de démarrage, pas seulement ici.             │
+                    # │                                                      │
+                    # │ Proportion volontairement majoritaire : un jeu où le │
+                    # │ cas dominant est minoritaire laisse passer les       │
+                    # │ modèles qui ne le gèrent pas.                        │
+                    # └──────────────────────────────────────────────────────┘
+                    "startDate": (
+                        ""
+                        if perdue
+                        else ("immediate" if i % 5 else _d(cloture + timedelta(days=30)))
+                    ),
                     "endDate": _d(cloture + timedelta(days=30 + jours)) if not perdue else "",
                     "closingDate": _d(cloture) if etat in (4, 5) else "",
                     "answerDate": _d(creation + timedelta(days=21)),
@@ -1258,6 +1282,21 @@ def _opportunites(
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+def _debut_besoin(attributs: dict[str, Any]) -> date:
+    """La date de démarrage d'un besoin, `immediate` résolu.
+
+    Le fournisseur rend soit une date, soit la chaîne littérale « immediate » —
+    cette dernière sur 82 % des besoins en production. Toute lecture de ce champ
+    doit donc prévoir les deux formes ; ce helper existe pour que le mock lui-même
+    ne l'oublie pas dans ses dérivations internes.
+    """
+    valeur = attributs.get("startDate") or ""
+    if valeur and valeur != "immediate":
+        return date.fromisoformat(valeur)
+    # « immediate » : le démarrage suit la création du besoin sans délai.
+    return date.fromisoformat(str(attributs["creationDate"])[:10])
+
+
 def _projets(
     opportunites: list[dict[str, Any]],
     societes: list[dict[str, Any]],
@@ -1275,7 +1314,13 @@ def _projets(
             opp = gagnees[i - 1]
             societe_id = opp["relationships"]["company"]["data"]["id"]
             societe = societes[int(societe_id) - 1]
-            debut = date.fromisoformat(opp["attributes"]["startDate"])
+            # `startDate` vaut « immediate » sur la majorité des besoins : le
+            # projet démarre alors tout de suite, et l'ancre la plus proche
+            # dont on dispose ici est la date de création du besoin. C'est
+            # exactement l'arbitrage qu'un consommateur doit faire — le mock
+            # le fait donc aussi, plutôt que d'exclure ces besoins et de
+            # rendre le littéral inatteignable en aval.
+            debut = _debut_besoin(opp["attributes"])
             mode = opp["attributes"]["mode"]
             reference_annee = debut.year
         else:

@@ -4050,6 +4050,11 @@ components:
           - type: string
           - type: 'null'
           title: Startdate
+          description: A DATE **or** the literal string `immediate` — 1 523 of the
+            1 850 production opportunities (82 %) carry the latter. Casting this field
+            to a date without guarding the literal fails on « invalid input syntax
+            for type date ». The dialect reuses the same literal for a resource's
+            `availability`.
         endDate:
           anyOf:
           - type: string
