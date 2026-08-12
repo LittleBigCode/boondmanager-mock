@@ -1487,23 +1487,33 @@ def _commandes(
                     "turnoverOrderedExcludingTax": commande_ca,
                     "deltaInvoicedExcludingTax": commande_ca,
                     "state": 1,
-                    "creationDate": _dt(debut - timedelta(days=5), 17, 5),
-                    # ┌─ PAS D'`updateDate` SUR LES COMMANDES ─────────────────┐
-                    # │ Le vendeur n'en rend pas — sondé le 2026-08-12 : sur   │
-                    # │ les dix-huit collections, `/orders` est la SEULE à en  │
-                    # │ manquer alors que le mock en servait un.               │
-                    # │                                                         │
-                    # │ Ce champ ne décore pas : il porte la STRATÉGIE         │
-                    # │ d'extraction. Le voyant ici, insights360 a déclaré la  │
-                    # │ collection incrémentale, et dlt a levé                 │
-                    # │ `IncrementalCursorPathMissing` au premier run réel —   │
-                    # │ emportant les six collections déclarées après elle.    │
-                    # │                                                         │
-                    # │ Sans horodatage, une collection se rafraîchit          │
-                    # │ entièrement. C'est un coût, et c'est au consommateur   │
-                    # │ de le voir : le mock doit le lui montrer, pas le lui   │
-                    # │ cacher derrière un champ inventé.                      │
-                    # └─────────────────────────────────────────────────────────┘
+                    # ┌─ NI `creationDate` NI `updateDate` SUR LES COMMANDES ───┐
+                    # │ Le fournisseur ne rend AUCUN des deux. Sondé le          │
+                    # │ 2026-08-12 : `/orders` est la seule des dix-huit         │
+                    # │ collections à manquer `updateDate`, et son atterrissage  │
+                    # │ dlt en production ne porte pas non plus `creation_date`. │
+                    # │                                                          │
+                    # │ `updateDate` d'abord : il porte la STRATÉGIE            │
+                    # │ d'extraction. Le voyant ici, insights360 a déclaré la   │
+                    # │ collection incrémentale, et dlt a levé                  │
+                    # │ `IncrementalCursorPathMissing` au premier run réel —    │
+                    # │ emportant les six collections déclarées après elle.     │
+                    # │                                                          │
+                    # │ `creationDate` ensuite, et c'est une erreur qu'il vaut  │
+                    # │ la peine de nommer : le registre des écarts le donnait  │
+                    # │ déjà pour absent du tenant, et 0.6.0 a choisi de le     │
+                    # │ servir quand même au motif qu'« il ne pilote aucune     │
+                    # │ stratégie, donc le servir ne coûte rien ». C'était      │
+                    # │ faux. Un modèle qui LIT une colonne a besoin qu'elle    │
+                    # │ EXISTE : `stg_commande` est tombé sur « column          │
+                    # │ o.creation_date does not exist » au run suivant.        │
+                    # │                                                          │
+                    # │ La règle n'admet donc pas d'exception « inoffensive » : │
+                    # │ un champ que le fournisseur ne rend pas ne doit pas     │
+                    # │ être rendu ici, quel qu'en soit l'usage supposé.        │
+                    # │ `date` reste, elle : c'est la date de commande, et      │
+                    # │ elle est bien rendue en réel.                           │
+                    # └──────────────────────────────────────────────────────────┘
                 },
                 "relationships": {
                     "mainManager": projet["relationships"]["mainManager"],

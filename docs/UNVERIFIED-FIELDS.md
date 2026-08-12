@@ -96,7 +96,7 @@ Gaps the mock KEEPS deliberately (tolerated by `compare_real.py`):
 | Gap | Why |
 |---|---|
 | `orders.updateDate` | **SETTLED on 2026-08-12 — the mock no longer emits it.** The RAML documents it and the official `period=updated` cursor on orders needs it, yet two probes eleven days apart found it absent from the tenant. The « version? » hypothesis of 2026-08-01 does not hold: it is the only one of the eighteen collections to lack the field, and the mock now matches. Consumers must extract `/orders` in full refresh. |
-| `orders.creationDate` | documented in the RAML, absent from the observed tenant. Still emitted — unlike `updateDate` it drives no extraction strategy, so serving it costs nothing and dropping it would remove a field a future version may return. |
+| `orders.creationDate` | **SETTLED on 2026-08-12 — no longer emitted either.** 0.6.0 kept it on the grounds that « it drives no extraction strategy, so serving it costs nothing ». That was wrong: a model which READS a column needs the column to EXIST, and `stg_commande` broke on « column o.creation_date does not exist » on the very next run. There is no such thing as a harmless invented field. `date` (the order date) IS returned by the vendor and stays. |
 | `expenses`: `row`, `numberOfKilometers`, `delivery`, `project` always emitted | the real API OMITS empty keys item by item (sparse emission); the mock emits the full RAML shape whenever the value exists |
 | `isDeleted` | mock affordance, **no longer in the default payload** (see below) |
 | `/actions` ignores `maxResults` | reproduced since 0.6.0 — see below |

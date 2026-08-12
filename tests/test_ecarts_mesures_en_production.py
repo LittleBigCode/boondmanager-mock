@@ -97,15 +97,26 @@ def test_le_drapeau_reste_disponible_apres_une_suppression_explicite(client):
 # ── 2. `/orders` ne porte pas d'horodatage de mise à jour ────────────────────
 
 
-def test_les_commandes_n_ont_pas_d_updatedate(client):
-    """`/orders` est la SEULE des dix-huit à en manquer.
+def test_les_commandes_n_ont_ni_updatedate_ni_creationdate(client):
+    """`/orders` ne porte AUCUN des deux horodatages.
 
-    Ce champ ne décore pas : il porte la stratégie d'extraction. Le servir ici
-    fait déclarer la collection incrémentale, et le curseur casse en réel.
+    `updateDate` d'abord : il porte la stratégie d'extraction, et le servir fait
+    déclarer la collection incrémentale — le curseur casse alors en réel.
+
+    `creationDate` ensuite, et c'est une erreur qu'il vaut la peine de garder
+    sous test : 0.6.0 l'avait maintenu au motif qu'« il ne pilote aucune
+    stratégie, donc le servir ne coûte rien ». C'était faux — un modèle qui LIT
+    une colonne a besoin qu'elle EXISTE, et `stg_commande` est tombé sur
+    « column o.creation_date does not exist » au run suivant.
+
+    D'où la forme de ce test : la règle n'admet pas d'exception « inoffensive ».
     """
     for ligne in _premiers(client, "orders", maxResults=10):
-        assert "updateDate" not in ligne["attributes"], (
-            "le fournisseur ne rend pas `updateDate` sur les commandes"
+        attributs = ligne["attributes"]
+        for champ in ("updateDate", "creationDate"):
+            assert champ not in attributs, f"le fournisseur ne rend pas `{champ}` sur les commandes"
+        assert "date" in attributs, (
+            "`date` (la date de commande) est bien rendue en réel — ne pas la retirer"
         )
 
 

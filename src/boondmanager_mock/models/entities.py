@@ -709,14 +709,22 @@ class AttributsCommande(AttributsBase):
     turnoverOrderedExcludingTax: float | None = None
     deltaInvoicedExcludingTax: float | None = None
     state: int | None = None
-    creationDate: str | None = None
-    # PAS d'`updateDate` : le vendeur n'en rend pas sur les commandes. Sondé le
-    # 2026-08-12 — sur les dix-huit collections, `/orders` est la SEULE à en
-    # manquer. Ce champ porte la stratégie d'extraction du consommateur, pas
-    # seulement de l'information : le servir ici lui a fait déclarer la
-    # collection incrémentale, et dlt a levé `IncrementalCursorPathMissing` au
-    # premier run réel. Sans horodatage, la collection se rafraîchit
-    # entièrement — un coût que le consommateur doit VOIR.
+    # NI `creationDate` NI `updateDate` : le vendeur n'en rend AUCUN des deux.
+    # Sondé le 2026-08-12 — `/orders` est la seule des dix-huit collections à
+    # manquer `updateDate`, et son atterrissage dlt en production ne porte pas
+    # `creation_date` non plus.
+    #
+    # `updateDate` porte la stratégie d'extraction du consommateur : le servir
+    # ici lui a fait déclarer la collection incrémentale, et dlt a levé
+    # `IncrementalCursorPathMissing` au premier run réel.
+    #
+    # `creationDate` a été gardé en 0.6.0 au motif qu'« il ne pilote aucune
+    # stratégie, donc le servir ne coûte rien ». C'était faux : un modèle qui LIT
+    # une colonne a besoin qu'elle EXISTE, et `stg_commande` est tombé sur
+    # « column o.creation_date does not exist » au run suivant. La règle
+    # n'admet donc pas d'exception « inoffensive ».
+    #
+    # `date` reste : c'est la date de commande, et elle est bien rendue en réel.
 
 
 class Commande(Permissif):

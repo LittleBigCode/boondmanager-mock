@@ -3110,11 +3110,6 @@ components:
           - type: integer
           - type: 'null'
           title: State
-        creationDate:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Creationdate
       additionalProperties: true
       type: object
       title: AttributsCommande
