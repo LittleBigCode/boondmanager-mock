@@ -186,6 +186,13 @@ All driveable over HTTP via `/__admin/inject`:
 And to simulate source-side changes: `POST /__admin/mutate` (bumps
 `updateDate`), `POST /__admin/delete` (logical deletion via `isDeleted`).
 
+> `isDeleted` is a **mock affordance, absent from every default payload** since
+> 0.6.0 — the vendor exposes it on none of its eighteen collections (probed
+> 2026-08-12). Only `/__admin/delete` sets it. A consumer must therefore read
+> its absence as « not deleted »: `not is_deleted` over a NULL column yields
+> NULL, hence an empty result set with no error. See
+> [docs/UNVERIFIED-FIELDS.md](docs/UNVERIFIED-FIELDS.md) §1.
+
 ## Compensation
 
 Served as a **file**, at `/__fixtures/remuneration.csv`, deliberately

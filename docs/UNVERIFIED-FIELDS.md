@@ -95,18 +95,66 @@ Gaps the mock KEEPS deliberately (tolerated by `compare_real.py`):
 
 | Gap | Why |
 |---|---|
-| `orders.creationDate` / `orders.updateDate` | documented in the RAML, and the official `period=updated` incremental cursor on orders needs them — the observed tenant did not return them (version?) |
+| `orders.updateDate` | **SETTLED on 2026-08-12 — the mock no longer emits it.** The RAML documents it and the official `period=updated` cursor on orders needs it, yet two probes eleven days apart found it absent from the tenant. The « version? » hypothesis of 2026-08-01 does not hold: it is the only one of the eighteen collections to lack the field, and the mock now matches. Consumers must extract `/orders` in full refresh. |
+| `orders.creationDate` | documented in the RAML, absent from the observed tenant. Still emitted — unlike `updateDate` it drives no extraction strategy, so serving it costs nothing and dropping it would remove a field a future version may return. |
 | `expenses`: `row`, `numberOfKilometers`, `delivery`, `project` always emitted | the real API OMITS empty keys item by item (sparse emission); the mock emits the full RAML shape whenever the value exists |
-| `isDeleted` everywhere | mock marker (see below) |
+| `isDeleted` | mock affordance, **no longer in the default payload** (see below) |
+| `/actions` ignores `maxResults` | reproduced since 0.6.0 — see below |
+| `candidates.availability` as an integer code | reproduced since 0.6.0 — see below |
 
 ## Still unattested
 
-### 1. `isDeleted` — **mock addition** (`unverified`)
+### 1. `isDeleted` — **mock affordance, ABSENT by default since 0.6.0**
 
-Carried by every item; set to `true` by `POST /__admin/delete`. An incremental
-pipeline running a `merge` strategy cannot observe a physical deletion. No
-equivalent field exists at the vendor. Profile projections do not carry it —
-the flag is read on searches.
+A probe of the **eighteen** production collections on 2026-08-12 found the field
+in NONE of them. It was previously emitted on every item, always `false`.
+
+That default was the costliest kind of fiction — the believable kind.
+insights360 built seventeen staging models on `where not is_deleted`, all green
+against this mock, all broken on the first production run with *« column
+is_deleted does not exist »*.
+
+The affordance itself is kept: an incremental pipeline running a `merge`
+strategy cannot observe a physical deletion, and `POST /__admin/delete` still
+sets the flag. What changed is that it takes a DELIBERATE act to see it. Absent
+by default, the payload now matches the vendor; present after an explicit admin
+call, it still exercises the consumer's deletion handling.
+
+⚠️ A consumer must read the ABSENCE as « not deleted ». `not is_deleted` over a
+NULL column yields NULL — hence an empty result set, with no error at all.
+
+*General lesson, and the reason this section is worth its length: a mock may
+offer affordances the vendor lacks, but it must not put them in the default
+payload, where they read as vendor behaviour.*
+
+### 1.b `/actions` ignores `maxResults` — **reproduced since 0.6.0**
+
+`GET /actions?maxResults=500` returns **30** rows — not 500, and not a cap at
+100: exactly the default page size, whatever value is sent. The parameter is
+accepted, never rejected. The ten other collections probed the same day honour
+500.
+
+This is not a comfort detail. A consumer sizing its pagination budget on 500
+under-counts pages by a factor of 16: 46 933 actions are 94 pages at 500, but
+**1 565** at 30. insights360 stopped at its 1 000-page guard while blaming the
+API for « always returning a full page » — the API was paginating correctly.
+
+Same family as the period filter ignored on `/times`: a parameter accepted and
+silently dropped is worse than one rejected, because nothing signals it.
+
+### 1.c `candidates.availability` is a CODE — **corrected in 0.6.0**
+
+On a **candidate**, `availability` is an integer: probed over 26 814 production
+candidates, `-1` on 24 289 of them, then 0, 1, 3, 4… The mock served an ISO
+date, so the consumer cast it to a date and broke on *« invalid input syntax for
+type bigint »*.
+
+⚠️ Not to be confused with a **resource**'s `availability`, which really is an
+availability date (or `"immediate"`). Same name, two types, two entities — the
+kind of gap a mock must carry rather than smooth over.
+
+The code→label mapping is not established: it lives in the instance dictionary,
+family `availability`, which `DOMAINES_DICTIONNAIRE` does not yet consume.
 
 ### 2. `updatedSince` / `filter[updateDate][gte]` — **mock affordance**
 

@@ -2466,14 +2466,16 @@ components:
     AttributsAbsence:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         startDate:
           anyOf:
           - type: string
@@ -2511,14 +2513,16 @@ components:
     AttributsAchat:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         date:
           anyOf:
           - type: string
@@ -2615,14 +2619,16 @@ components:
     AttributsAction:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         startDate:
           anyOf:
           - type: string
@@ -2764,14 +2770,16 @@ components:
     AttributsAgence:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         name:
           type: string
           title: Name
@@ -2858,14 +2866,16 @@ components:
     AttributsCandidat:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         creationDate:
           anyOf:
           - type: string
@@ -2925,9 +2935,13 @@ components:
           title: Title
         availability:
           anyOf:
-          - type: string
+          - type: integer
           - type: 'null'
           title: Availability
+          description: 'CODE, not a date — unlike a resource''s `availability`. Probed
+            on 26 814 production candidates (2026-08-12): integers, `-1` on 24 289
+            of them. The code→label mapping lives in the instance dictionary, family
+            `availability`.'
         email1:
           anyOf:
           - type: string
@@ -3046,14 +3060,16 @@ components:
     AttributsCommande:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         date:
           anyOf:
           - type: string
@@ -3099,25 +3115,22 @@ components:
           - type: string
           - type: 'null'
           title: Creationdate
-        updateDate:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Updatedate
       additionalProperties: true
       type: object
       title: AttributsCommande
     AttributsContact:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         creationDate:
           anyOf:
           - type: string
@@ -3228,14 +3241,16 @@ components:
     AttributsContrat:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         typeOf:
           anyOf:
           - type: integer
@@ -3398,14 +3413,16 @@ components:
     AttributsCra:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         term:
           anyOf:
           - type: string
@@ -3515,14 +3532,16 @@ components:
     AttributsFacture:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         date:
           anyOf:
           - type: string
@@ -3669,14 +3688,16 @@ components:
     AttributsFrais:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         category:
           anyOf:
           - type: string
@@ -3777,14 +3798,16 @@ components:
     AttributsMission:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         startDate:
           anyOf:
           - type: string
@@ -3978,14 +4001,16 @@ components:
     AttributsOpportunite:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         creationDate:
           anyOf:
           - type: string
@@ -4136,14 +4161,16 @@ components:
     AttributsPaiement:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         date:
           anyOf:
           - type: string
@@ -4205,14 +4232,16 @@ components:
     AttributsPole:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         name:
           type: string
           title: Name
@@ -4229,14 +4258,16 @@ components:
     AttributsProjet:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         startDate:
           anyOf:
           - type: string
@@ -4373,14 +4404,16 @@ components:
     AttributsRessource:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         creationDate:
           anyOf:
           - type: string
@@ -4581,14 +4614,16 @@ components:
     AttributsRole:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         name:
           type: string
           title: Name
@@ -4631,14 +4666,16 @@ components:
     AttributsSociete:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         name:
           type: string
           title: Name
@@ -4705,14 +4742,16 @@ components:
     AttributsTemps:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         category:
           anyOf:
           - type: string
@@ -4744,14 +4783,16 @@ components:
     AttributsTransactionBancaire:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         amount:
           anyOf:
           - type: number
@@ -4809,14 +4850,16 @@ components:
     AttributsUniteOperationnelle:
       properties:
         isDeleted:
-          type: boolean
+          anyOf:
+          - type: boolean
+          - type: 'null'
           title: Isdeleted
-          default: false
           x-boond-confidence: unverified
-          x-boond-note: LOGICAL deletion — mock addition. An incremental pipeline
-            running a merge strategy cannot observe a physical deletion; /__admin/delete
-            sets this flag instead of removing the row. No equivalent vendor field
-            is attested.
+          x-boond-note: LOGICAL deletion — mock affordance, NEVER emitted by the vendor
+            (probed across all eighteen collections, 2026-08-12). Absent from every
+            default payload; only /__admin/delete sets it. A consumer MUST treat its
+            absence as « not deleted » — reading `not is_deleted` on a NULL column
+            yields NULL, hence an empty result set with no error at all.
         name:
           type: string
           title: Name

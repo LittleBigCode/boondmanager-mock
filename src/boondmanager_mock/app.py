@@ -368,7 +368,7 @@ def _paginated(request: Request, spec: CollectionSpec) -> JSONResponse:
     total = len(items)
     items = apply_order(items, params, engine.request_counts.get(path, 1))
 
-    paged = paginate(items, params)
+    paged = paginate(items, params, path_name)
     if paged is None:
         return error(422, "Wrong or missing attribute: page/maxResults")
     slice_, page, page_size = paged

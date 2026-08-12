@@ -219,15 +219,46 @@ def apply_page_drift(
     return tous[debut : debut + page_size]
 
 
+#: Collections dont le fournisseur IGNORE `maxResults` et sert toujours sa
+#: taille de page par défaut.
+#:
+#: ┌─ MESURÉ, PAS SUPPOSÉ — 2026-08-12, contre un tenant de production ────────┐
+#: │ `GET /actions?maxResults=500` rend **30** lignes. Pas 500, pas un cap à   │
+#: │ 100 : exactement la taille par défaut, quelle que soit la valeur envoyée. │
+#: │ Les dix autres collections sondées le même jour honorent 500.            │
+#: │                                                                           │
+#: │ Ce n'est pas un détail de confort. Un consommateur qui croit tenir 500    │
+#: │ lignes par page calcule son budget de pagination dessus : 46 933 actions  │
+#: │ font 94 pages à 500, mais **1 565** à 30. insights360 s'est arrêté à sa   │
+#: │ garde de 1 000 pages en accusant l'API de « toujours rendre une page      │
+#: │ pleine » — alors qu'elle paginait parfaitement.                           │
+#: │                                                                           │
+#: │ Le mock honorait 500 partout, donc la chaîne était verte en CI et fausse  │
+#: │ en production. C'est exactement ce que ce dépôt existe pour empêcher.     │
+#: │ Même famille que le filtre de période ignoré sur /times.                  │
+#: └───────────────────────────────────────────────────────────────────────────┘
+COLLECTIONS_SANS_MAXRESULTS: frozenset[str] = frozenset({"actions"})
+
+
 def paginate(
-    items: list[dict[str, Any]], params: dict[str, str]
+    items: list[dict[str, Any]], params: dict[str, str], collection: str | None = None
 ) -> tuple[list[dict[str, Any]], int, int] | None:
-    """Rend (tranche, page, taille) ou None si les paramètres sont invalides."""
+    """Rend (tranche, page, taille) ou None si les paramètres sont invalides.
+
+    `collection` est le NOM NU de la collection (`actions`, pas `/api/actions`)
+    et sert UNIQUEMENT à reproduire celles qui ignorent `maxResults` — cf.
+    COLLECTIONS_SANS_MAXRESULTS. Il reste optionnel : un appelant qui ne pagine
+    pas une collection nommée n'a rien à changer.
+    """
     try:
         page = max(1, int(params.get("page", 1)))
         requested = int(params.get("maxResults", settings.default_max_results))
     except ValueError:
         return None
+    # Le paramètre est ACCEPTÉ puis ignoré — pas rejeté. Un 422 ici enverrait
+    # le consommateur corriger un appel parfaitement légitime.
+    if collection in COLLECTIONS_SANS_MAXRESULTS:
+        requested = settings.default_max_results
     page_size = min(settings.max_results_cap, max(1, requested))
     start = (page - 1) * page_size
     return items[start : start + page_size], page, page_size

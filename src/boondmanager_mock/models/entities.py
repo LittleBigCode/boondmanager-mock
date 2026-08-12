@@ -26,15 +26,40 @@ from .common import Permissif, RefDonnee, Relation, unverified
 
 
 class AttributsBase(Permissif):
-    """The only cross-cutting field added by the mock."""
+    """The only cross-cutting field added by the mock — and it is ABSENT by default.
 
-    isDeleted: bool = Field(
-        default=False,
+    ┌─ `isDeleted` IS NOT A VENDOR FIELD, AND NOW THE MOCK SAYS SO ────────────┐
+    │ It was emitted on every record, always `False`. A probe of the eighteen  │
+    │ production collections on 2026-08-12 found it in NONE of them: the       │
+    │ vendor simply does not expose it.                                        │
+    │                                                                          │
+    │ Emitting it by default was the costliest kind of fiction — the           │
+    │ believable kind. insights360 built seventeen staging models on           │
+    │ `where not is_deleted`, all green against this mock, all broken on the   │
+    │ first production run with « column is_deleted does not exist ».          │
+    │                                                                          │
+    │ The field keeps its PURPOSE: an incremental pipeline running a `merge`   │
+    │ strategy cannot observe a physical deletion, and `/__admin/delete` needs │
+    │ a way to express one. So the flag still exists — but only once an        │
+    │ operator has DELIBERATELY created that scenario. Absent by default, it   │
+    │ now matches the vendor; present after an explicit admin call, it still   │
+    │ exercises the consumer's deletion handling.                              │
+    │                                                                          │
+    │ That distinction is the whole point: the mock may offer affordances the  │
+    │ vendor lacks, but it must not put them in the default payload, where     │
+    │ they read as vendor behaviour.                                           │
+    └──────────────────────────────────────────────────────────────────────────┘
+    """
+
+    isDeleted: bool | None = Field(
+        default=None,
         json_schema_extra=unverified(
-            "LOGICAL deletion — mock addition. An incremental pipeline running "
-            "a merge strategy cannot observe a physical deletion; "
-            "/__admin/delete sets this flag instead of removing the row. No "
-            "equivalent vendor field is attested."
+            "LOGICAL deletion — mock affordance, NEVER emitted by the vendor "
+            "(probed across all eighteen collections, 2026-08-12). Absent from "
+            "every default payload; only /__admin/delete sets it. A consumer "
+            "MUST treat its absence as « not deleted » — reading `not "
+            "is_deleted` on a NULL column yields NULL, hence an empty result "
+            "set with no error at all."
         ),
     )
 
@@ -296,7 +321,15 @@ class AttributsCandidat(AttributsBase):
     skills: str | None = None
     mobilityAreas: list[str] = Field(default_factory=list)
     title: str | None = None
-    availability: str | None = None
+    availability: int | None = Field(
+        default=None,
+        description=(
+            "CODE, not a date — unlike a resource's `availability`. Probed on "
+            "26 814 production candidates (2026-08-12): integers, `-1` on "
+            "24 289 of them. The code→label mapping lives in the instance "
+            "dictionary, family `availability`."
+        ),
+    )
     email1: str | None = None
     email2: str | None = None
     email3: str | None = None
@@ -677,7 +710,13 @@ class AttributsCommande(AttributsBase):
     deltaInvoicedExcludingTax: float | None = None
     state: int | None = None
     creationDate: str | None = None
-    updateDate: str | None = None
+    # PAS d'`updateDate` : le vendeur n'en rend pas sur les commandes. Sondé le
+    # 2026-08-12 — sur les dix-huit collections, `/orders` est la SEULE à en
+    # manquer. Ce champ porte la stratégie d'extraction du consommateur, pas
+    # seulement de l'information : le servir ici lui a fait déclarer la
+    # collection incrémentale, et dlt a levé `IncrementalCursorPathMissing` au
+    # premier run réel. Sans horodatage, la collection se rafraîchit
+    # entièrement — un coût que le consommateur doit VOIR.
 
 
 class Commande(Permissif):

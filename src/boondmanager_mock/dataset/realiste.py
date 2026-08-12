@@ -514,7 +514,6 @@ def _agences() -> list[dict[str, Any]]:
                     "workUnitRate": 1,
                     "workUnitRateOnProjectsAndOpportunities": 1,
                     "subDivision": "",
-                    "isDeleted": False,
                 },
             }
         )
@@ -532,7 +531,6 @@ def _business_units(ressources: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "type": "businessunit",
                 "attributes": {
                     "name": nom,
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "includedManagers": {
@@ -552,7 +550,6 @@ def _poles() -> list[dict[str, Any]]:
             "attributes": {
                 "name": nom,
                 "state": True,
-                "isDeleted": False,
             },
         }
         for i, nom in enumerate(_POLES, start=1)
@@ -580,7 +577,6 @@ def _roles() -> list[dict[str, Any]]:
                 "isSecondaryPolesAllowed": po,
                 "typeOf": type_of,
                 "isSystem": systeme,
-                "isDeleted": False,
             },
         }
         for i, (nom, comptes, actifs, ag, po, type_of, systeme) in enumerate(lignes, start=1)
@@ -779,7 +775,6 @@ def _ressources(rng: random.Random) -> list[dict[str, Any]]:
                             "url": f"https://www.linkedin.com/in/{prenom.lower()}-{nom.lower()}",
                         }
                     ],
-                    "isDeleted": False,
                     # Clé INTERNE au générateur (retirée avant publication).
                     "_bu": bu,
                 },
@@ -915,7 +910,6 @@ def _contrat(
             "activityRate": 100,
             "partialWorkTimes": [],
             "isPartialWorkTimeEvenOdd": False,
-            "isDeleted": False,
         },
         "relationships": rels,
     }
@@ -962,7 +956,26 @@ def _candidats(rng: random.Random) -> list[dict[str, Any]]:
                         [["Île-de-France"], ["Télétravail total"], ["Auvergne-Rhône-Alpes"]]
                     ),
                     "title": titre,
-                    "availability": _d(date(2026, rng.randint(8, 12), 1)),
+                    # ┌─ SUR UN CANDIDAT, `availability` EST UN CODE ──────────┐
+                    # │ Pas une date. Relevé le 2026-08-12 sur les 26 814      │
+                    # │ candidats d'un tenant de production : des ENTIERS,     │
+                    # │ dont `-1` sur 24 289 d'entre eux, puis 0, 1, 3, 4…     │
+                    # │ Le mock servait une date ISO, et `stg_candidat` la     │
+                    # │ castait donc en date — d'où, au premier run réel,      │
+                    # │ « invalid input syntax for type bigint: "" ».          │
+                    # │                                                         │
+                    # │ ⚠️ Ne pas confondre avec `availability` d'une          │
+                    # │    RESSOURCE, qui est bien une date de disponibilité.  │
+                    # │    Même nom, deux types, deux entités : c'est          │
+                    # │    précisément le genre d'écart qu'un mock doit porter │
+                    # │    plutôt que lisser.                                  │
+                    # │                                                         │
+                    # │ La correspondance code → libellé n'est PAS établie :   │
+                    # │ elle vit dans le dictionnaire de l'instance, famille   │
+                    # │ `availability`. Le mock rend donc des codes bruts, et  │
+                    # │ le consommateur qui veut un libellé passe par lui.     │
+                    # └─────────────────────────────────────────────────────────┘
+                    "availability": rng.choice([-1, -1, -1, -1, 0, 1, 3, 4]),
                     "email1": f"{prenom.lower()}.{nom.lower()}@courriel.example",
                     "email2": "",
                     "email3": "",
@@ -1030,7 +1043,6 @@ def _candidats(rng: random.Random) -> list[dict[str, Any]]:
                     "tools": [{"tool": c, "level": rng.randint(2, 5)} for c in competences[:3]],
                     "canShowTechnicalData": True,
                     "canShowActions": True,
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": _rel("resource", rng.choice((2, 4, 6))),
@@ -1079,7 +1091,6 @@ def _societes(rng: random.Random) -> list[dict[str, Any]]:
                             f"{nom.lower().replace(' ', '-')}",
                         }
                     ],
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": _rel("resource", rng.choice((2, 3, 5))),
@@ -1131,7 +1142,6 @@ def _contacts(societes: list[dict[str, Any]], rng: random.Random) -> list[dict[s
                         "typesOf": [],
                         "socialNetworks": [],
                         "updateDate": _maj(rng, creation),
-                        "isDeleted": False,
                     },
                     "relationships": {
                         "mainManager": societe["relationships"]["mainManager"],
@@ -1229,7 +1239,6 @@ def _opportunites(
                         else {"typeOf": 0, "detail": ""}
                     ),
                     "updateDate": _maj(rng, cloture if etat in (4, 5) else creation),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": societe["relationships"]["mainManager"],
@@ -1311,7 +1320,6 @@ def _projets(
                     "canShowMarginSimulatedExcludingTax": True,
                     "creationDate": _dt(debut - timedelta(days=20), 15, 10),
                     "updateDate": _maj(rng, debut),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": societe["relationships"]["mainManager"],
@@ -1408,7 +1416,6 @@ def _missions(
                         "updateDate": _maj(rng, debut_projet),
                         "calendar": "Standard",
                         "isTurnoverProductionIncluded": True,
-                        "isDeleted": False,
                     },
                     "relationships": {
                         "project": _rel("project", projet["id"]),
@@ -1481,8 +1488,22 @@ def _commandes(
                     "deltaInvoicedExcludingTax": commande_ca,
                     "state": 1,
                     "creationDate": _dt(debut - timedelta(days=5), 17, 5),
-                    "updateDate": _maj(rng, debut),
-                    "isDeleted": False,
+                    # ┌─ PAS D'`updateDate` SUR LES COMMANDES ─────────────────┐
+                    # │ Le vendeur n'en rend pas — sondé le 2026-08-12 : sur   │
+                    # │ les dix-huit collections, `/orders` est la SEULE à en  │
+                    # │ manquer alors que le mock en servait un.               │
+                    # │                                                         │
+                    # │ Ce champ ne décore pas : il porte la STRATÉGIE         │
+                    # │ d'extraction. Le voyant ici, insights360 a déclaré la  │
+                    # │ collection incrémentale, et dlt a levé                 │
+                    # │ `IncrementalCursorPathMissing` au premier run réel —   │
+                    # │ emportant les six collections déclarées après elle.    │
+                    # │                                                         │
+                    # │ Sans horodatage, une collection se rafraîchit          │
+                    # │ entièrement. C'est un coût, et c'est au consommateur   │
+                    # │ de le voir : le mock doit le lui montrer, pas le lui   │
+                    # │ cacher derrière un champ inventé.                      │
+                    # └─────────────────────────────────────────────────────────┘
                 },
                 "relationships": {
                     "mainManager": projet["relationships"]["mainManager"],
@@ -1566,7 +1587,6 @@ def _factures(
                         "canSendWithPeppol": True,
                         "canSendWithDgfip": False,
                         "canSendWithPennylane": False,
-                        "isDeleted": False,
                     },
                     "relationships": {
                         "order": _rel("order", commande["id"]),
@@ -1689,7 +1709,6 @@ def _banque(
                     "canReadTransaction": True,
                     "canWriteTransaction": True,
                     "canReconcile": True,
-                    "isDeleted": False,
                 },
                 "relationships": {"account": _rel("bankingaccount", 1)},
             }
@@ -1717,7 +1736,6 @@ def _banque(
                     "canReadTransaction": True,
                     "canWriteTransaction": True,
                     "canReconcile": True,
-                    "isDeleted": False,
                 },
                 "relationships": {"account": _rel("bankingaccount", 2)},
             }
@@ -1775,7 +1793,6 @@ def _achats(
                     "engagedPaymentsAmountExcludingTax": 0.0,
                     "creationDate": _dt(debut - timedelta(days=8), 11, 45),
                     "updateDate": _maj(rng, debut),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": _rel("resource", 2),
@@ -1824,7 +1841,6 @@ def _achats(
                     "engagedPaymentsAmountExcludingTax": 0.0,
                     "creationDate": _dt(jour, 10, 25),
                     "updateDate": _maj(rng, jour),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": _rel("resource", 1),
@@ -1873,7 +1889,6 @@ def _paiements(achats: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "canWritePayment": True,
                         "creationDate": _dt(jour - timedelta(days=10), 9, 20),
                         "updateDate": _dt(min(jour, DERNIERE_MAJ), 15, 40),
-                        "isDeleted": False,
                     },
                     "relationships": {"purchase": _rel("purchase", achat["id"])},
                 }
@@ -1936,7 +1951,6 @@ def _cras(
                         "term": f"{annee:04d}-{mois:02d}",
                         "state": etat,
                         "closed": clos,
-                        "isDeleted": False,
                     },
                     "relationships": {
                         # L'agence vient de la LIGNE DE FAIT, pas du
@@ -1995,7 +2009,6 @@ def _temps(
                         "row": 1,
                         "startDate": _d(date(annee, mois, 1)),
                         "duration": jours,
-                        "isDeleted": False,
                     },
                     "relationships": {
                         "timesReport": _rel("timesreport", cra_id),
@@ -2020,7 +2033,6 @@ def _temps(
                             "row": 2,
                             "startDate": _d(date(annee, mois, rng.choice([7, 14, 21]))),
                             "duration": 1.0,
-                            "isDeleted": False,
                         },
                         "relationships": {
                             "timesReport": _rel("timesreport", cra_id),
@@ -2053,7 +2065,6 @@ def _temps(
                         "row": 1,
                         "startDate": _d(date(annee, mois, 1)),
                         "duration": 9.0 if mois == 7 else float(_jours_ouvres(annee, mois)),
-                        "isDeleted": False,
                     },
                     "relationships": {
                         "timesReport": _rel("timesreport", cra_id),
@@ -2140,7 +2151,6 @@ def _absences_et_rapports(
                                 "workUnitRate": 1,
                             },
                         },
-                        "isDeleted": False,
                     },
                 }
             )
@@ -2235,7 +2245,6 @@ def _frais(
                                 "id": projet["id"],
                                 "reference": projet["attributes"]["reference"],
                             },
-                            "isDeleted": False,
                         },
                     }
                 )
@@ -2286,7 +2295,6 @@ def _actions(
                     "canReadAction": True,
                     "canWriteAction": True,
                     "updateDate": _dt(min(jour, DERNIERE_MAJ), 18, 55),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": _rel("resource", manager),

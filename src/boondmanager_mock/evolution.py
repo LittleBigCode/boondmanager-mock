@@ -226,7 +226,6 @@ class Evolution:
                     "canReadAction": True,
                     "canWriteAction": True,
                     "updateDate": _ts(age),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": {"data": {"id": str(rng.choice((2, 3, 5))), "type": "resource"}},
@@ -422,7 +421,6 @@ class Evolution:
                     "canReadTransaction": True,
                     "canWriteTransaction": True,
                     "canReconcile": True,
-                    "isDeleted": False,
                 },
                 "relationships": {"account": {"data": {"id": "1", "type": "bankingaccount"}}},
             }
@@ -499,7 +497,6 @@ class Evolution:
                     "typesOf": [],
                     "socialNetworks": [],
                     "updateDate": _ts(age),
-                    "isDeleted": False,
                 },
                 "relationships": {
                     "mainManager": societe["relationships"]["mainManager"],
