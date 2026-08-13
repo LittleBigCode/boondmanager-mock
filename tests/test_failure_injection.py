@@ -239,6 +239,28 @@ def test_state_expose_les_parametres_recus(client) -> None:
     assert etat["request_counts_by_path"]["/api/resources"] >= 1
 
 
+def test_l_historique_des_parametres_garde_tous_les_appels(client) -> None:
+    """Deux consommateurs du meme chemin ne s'ecrasent plus dans l'etat.
+
+    Constate le 13/08 cote consommateur : les ressources s'extraient en
+    incremental (updatedSince), puis la collecte des contrats reliste le meme
+    chemin sans curseur — et `last_query_params_by_path` ne montrait que le
+    second appel. L'historique garde les deux, dans l'ordre.
+    """
+    client.get(
+        "/api/resources",
+        headers=JWT,
+        params={"updatedSince": "2026-01-01T00:00:00Z", "sort": "id"},
+    )
+    client.get("/api/resources", headers=JWT, params={"sort": "id"})
+    etat = client.get("/__admin/state", headers=ADMIN).json()
+    appels = etat["query_params_by_path"]["/api/resources"]
+    assert len(appels) >= 2
+    assert appels[-2].get("updatedSince") == "2026-01-01T00:00:00Z"
+    assert "updatedSince" not in appels[-1]
+    assert etat["last_query_params_by_path"]["/api/resources"] == appels[-1]
+
+
 def test_reset_change_de_graine(client) -> None:
     """La graine est réglable par HTTP — et le reset la confirme."""
     reponse = client.post("/__admin/reset", headers=ADMIN, json={"seed": 7})

@@ -67,6 +67,10 @@ class Rule:
         return True
 
 
+#: Appels conserves par chemin dans l'historique du plan de controle.
+_HISTORIQUE_MAX = 500
+
+
 class InjectionEngine:
     """Le moteur, et le compteur de requêtes par chemin dont il dépend."""
 
@@ -74,6 +78,14 @@ class InjectionEngine:
         self.rules: list[Rule] = []
         self.request_counts: dict[str, int] = {}
         self.last_query_params: dict[str, dict[str, str]] = {}
+        # L'HISTORIQUE, pas seulement le dernier : deux consommateurs legitimes
+        # peuvent frapper le meme chemin avec des strategies differentes (les
+        # ressources en incremental, les contrats en refresh complet). Ne garder
+        # que le dernier fait mentir le plan de controle — constate le 13/08 :
+        # un test d'incrementalite cote consommateur est tombe parce que le
+        # second appelant ecrasait la trace du premier. Borne par chemin : un
+        # etat qui grossit sans limite finirait coupe.
+        self.query_params_history: dict[str, list[dict[str, str]]] = {}
         self._next_id = 1
         # Horloge virtuelle : permet de tester des fenêtres temporelles sans
         # `sleep`, donc sans rendre la suite lente ni dépendante du timing réel.
@@ -98,6 +110,7 @@ class InjectionEngine:
     def reset_counters(self) -> None:
         self.request_counts.clear()
         self.last_query_params.clear()
+        self.query_params_history.clear()
         self.clock_offset = 0.0
 
     # ── Observation ──────────────────────────────────────────────────────────
@@ -112,6 +125,10 @@ class InjectionEngine:
         """
         self.request_counts[path] = self.request_counts.get(path, 0) + 1
         self.last_query_params[path] = dict(params)
+        historique = self.query_params_history.setdefault(path, [])
+        historique.append(dict(params))
+        if len(historique) > _HISTORIQUE_MAX:
+            del historique[0]
         return self.request_counts[path]
 
     def now(self) -> float:

@@ -82,6 +82,9 @@ def get_state(x_mock_admin_token: str | None = Header(default=None)) -> JSONResp
             "totals": state.totals(),
             "request_counts_by_path": dict(engine.request_counts),
             "last_query_params_by_path": dict(engine.last_query_params),
+            "query_params_by_path": {
+                chemin: list(appels) for chemin, appels in engine.query_params_history.items()
+            },
             "injections": engine.snapshot(),
             "fail_collections": sorted(state.fail_collections),
             "clock_offset": engine.clock_offset,
