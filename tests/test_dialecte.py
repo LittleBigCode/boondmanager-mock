@@ -258,8 +258,15 @@ def test_administrative_liste_les_contrats_et_contracts_id_les_detaille(client):
     """Le flux complet : administrative → refs de contrats → détail salarié.
 
     `GET /resources/{id}/administrative` → `relationships.contracts` +
-    `included` réduit, puis `GET /contracts/{id}` pour le salaire officiel
-    (`monthlySalary`) — le parcours qu'un extracteur rejouera sur la vraie API.
+    `included`, puis `GET /contracts/{id}` pour le détail — le parcours qu'un
+    extracteur rejouera sur la vraie API.
+
+    ⚠️ `included` n'est PAS réduit, contrairement à ce que ce test affirmait
+    jusqu'au 2026-08-13. Sondé en production : les seize attributs du contrat y
+    sont, `monthlySalary` compris et renseigné. La forme réduite était une
+    invention du mock, et elle a coûté cher — ne trouvant la rémunération nulle
+    part, le consommateur a conclu qu'aucun endpoint ne l'exposait
+    (SPEC-DEVIATIONS #5) et a bâti un détour par un CSV de fixtures.
     """
     adm = client.get("/api/resources/7/administrative", headers=JWT).json()
     corps = adm["data"]
@@ -270,7 +277,12 @@ def test_administrative_liste_les_contrats_et_contracts_id_les_detaille(client):
     refs = corps["relationships"]["contracts"]["data"]
     assert refs
     contrat_inclus = next(e for e in adm["included"] if e["type"] == "contract")
-    assert set(contrat_inclus["attributes"]) == {"typeOf", "startDate", "endDate"}
+    # `included` porte la forme COMPLÈTE — c'est le seul chemin praticable vers
+    # le salaire, `GET /contracts` répondant 405 chez le fournisseur.
+    assert {"typeOf", "startDate", "endDate", "monthlySalary", "activityRate"} <= set(
+        contrat_inclus["attributes"]
+    )
+    assert contrat_inclus["attributes"]["monthlySalary"] > 1500
     assert contrat_inclus["relationships"]["agency"]["data"]["type"] == "agency"
 
     for ref in refs:

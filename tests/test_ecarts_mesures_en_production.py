@@ -212,3 +212,52 @@ def test_la_disponibilite_d_une_ressource_reste_une_date(client):
         assert isinstance(valeur, str), (
             f"availability = {valeur!r} — sur une ressource, c'est une date ou « immediate »"
         )
+
+
+# ── 6. Le contrat dans `included` porte la rémunération ─────────────────────
+
+
+def test_le_contrat_inclus_porte_le_salaire(client):
+    """`GET /contracts` répond 405 : `included` est le SEUL chemin vers le salaire.
+
+    Le mock n'y servait que trois attributs, sur l'idée d'une « forme réduite ».
+    Sondé en production le 2026-08-13 : les seize attributs y sont, dont
+    `monthlySalary`, renseigné.
+
+    Ce que la forme réduite a coûté : ne trouvant la rémunération nulle part, le
+    consommateur a conclu — et écrit dans SPEC-DEVIATIONS #5 — qu'aucun endpoint
+    de rémunération n'était attesté chez BoondManager, puis a bâti tout un
+    détour par un CSV de fixtures. Le fournisseur la servait depuis le début.
+    """
+    ressources = _premiers(client, "resources", maxResults=20)
+    contrats = []
+    for ressource in ressources:
+        reponse = client.get(f"/api/resources/{ressource['id']}/administrative", headers=JWT)
+        assert reponse.status_code == 200
+        contrats += [
+            inclus
+            for inclus in (reponse.json().get("included") or [])
+            if inclus.get("type") == "contract"
+        ]
+
+    assert contrats, "aucun contrat dans `included` — le chemin vers le salaire est coupé"
+    for contrat in contrats:
+        attributs = contrat["attributes"]
+        assert "monthlySalary" in attributs, (
+            "`monthlySalary` absent d'`included` : le consommateur ne peut PAS "
+            "l'atteindre autrement, `GET /contracts` répondant 405."
+        )
+        assert isinstance(attributs["monthlySalary"], (int, float))
+        # Le taux d'activité change la lecture du montant : un 80 % au même
+        # salaire contractuel ne pèse pas la même chose sur la masse salariale.
+        assert "activityRate" in attributs
+
+
+def test_la_liste_des_contrats_reste_un_405(client):
+    """Le garde inverse : c'est le 405 qui rend `included` indispensable.
+
+    Si la liste devenait accessible, le détour par la fiche ressource — 364
+    appels en production — n'aurait plus lieu d'être. Ce test dit que ce n'est
+    pas le cas, et il le dira le jour où ça changera.
+    """
+    assert client.get("/api/contracts", headers=JWT).status_code == 405

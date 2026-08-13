@@ -52,7 +52,47 @@ _PERSONNE: Forme = (("firstName", "lastName"), ())
 _PERSONNE_RICHE: Forme = (("firstName", "lastName", "email1", "phone1", "phone2", "thumbnail"), ())
 _NOM: Forme = (("name",), ())
 _ACTION: Forme = (("startDate", "typeOf", "text"), ())
-_CONTRAT: Forme = (("typeOf", "startDate", "endDate"), ("agency",))
+#: ┌─ LE CONTRAT DANS `included` N'EST PAS RÉDUIT ─────────────────────────────┐
+#: │ Il ne portait que trois attributs, sur l'idée — écrite dans le docstring  │
+#: │ de la route — qu'`included` livre une « forme réduite » et que le détail  │
+#: │ vit sur `GET /contracts/{id}`.                                            │
+#: │                                                                            │
+#: │ Sondé le 2026-08-13 contre la production : `/resources/{id}/              │
+#: │ administrative` rend les SEIZE attributs du contrat dans `included`,      │
+#: │ `monthlySalary` compris et renseigné. La forme réduite était une          │
+#: │ invention du mock.                                                        │
+#: │                                                                            │
+#: │ Ce que ça coûtait : `GET /contracts` répond 405 chez le fournisseur, donc │
+#: │ `included` est le SEUL chemin praticable vers la rémunération. Un         │
+#: │ consommateur qui s'y fie n'aurait rien trouvé en CI, et aurait conclu     │
+#: │ — comme SPEC-DEVIATIONS #5 l'a fait — qu'aucun endpoint de rémunération   │
+#: │ n'existe chez BoondManager.                                               │
+#: │                                                                            │
+#: │ ⚠️ Ces champs sont de la donnée RH. Le mock les sert parce que le          │
+#: │    fournisseur les sert ; c'est au CONSOMMATEUR de minimiser à            │
+#: │    l'extraction, et insights360 le fait par liste blanche.                │
+#: └────────────────────────────────────────────────────────────────────────────┘
+_CONTRAT: Forme = (
+    (
+        "typeOf",
+        "startDate",
+        "endDate",
+        "monthlySalary",
+        "employeeType",
+        "activityRate",
+        "classification",
+        "calendar",
+        "currency",
+        "currencyAgency",
+        "exchangeRate",
+        "exchangeRateAgency",
+        "contractAverageDailyCost",
+        "contractAverageDailyProductionCost",
+        "advantageTypes",
+        "informationComments",
+    ),
+    ("agency",),
+)
 
 #: module (clé de dataset, ou `<clé>/profil` pour les détails) → {type → forme}.
 #: Valeurs relevées dans les blocs `included` des schémas search/profile
